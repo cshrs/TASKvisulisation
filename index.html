@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>TASK Stock & Sales Visualisation</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Libraries (CDN) -->
+  <script defer src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script defer src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0"></script>
+
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <header>
+    <h1>TASK Export Visualisation</h1>
+    <div class="controls">
+      <label class="file">
+        <input id="file" type="file" accept=".csv" />
+        <span>Choose CSV (raw export, unmodified)</span>
+      </label>
+
+      <button id="loadSample" title="If you committed a CSV into the repo, set its filename in app.js">Load CSV from site</button>
+
+      <input id="search" type="search" placeholder="Search Description / Stock Code…" />
+      <select id="supplierFilter"><option value="">Supplier (All)</option></select>
+      <select id="brandFilter"><option value="">Brand (All)</option></select>
+    </div>
+  </header>
+
+  <main>
+    <div id="kpis" class="kpis">
+      <div class="kpi"><div class="kpi-value" id="kpiTotalSkus">–</div><div class="kpi-label">SKUs</div></div>
+      <div class="kpi"><div class="kpi-value" id="kpiStockValue">–</div><div class="kpi-label">Stock Value</div></div>
+      <div class="kpi"><div class="kpi-value" id="kpiAvgProfit">–</div><div class="kpi-label">Avg % Profit</div></div>
+      <div class="kpi"><div class="kpi-value" id="kpiSalesYTD">–</div><div class="kpi-label">Sales YTD</div></div>
+    </div>
+
+    <div class="chart" id="profitByItem"></div>
+    <div class="chart" id="stockVsDemand"></div>
+    <div class="chart" id="salesTrend"></div>
+    <div class="chart" id="profitDistribution"></div>
+    <div class="chart" id="supplierPerformance"></div>
+
+    <p class="note">Tip: filter with the search box (SKU or description), or by Supplier/Brand. All parsing happens in-memory. Your CSV content is not altered.</p>
+  </main>
+</body>
+</html>
