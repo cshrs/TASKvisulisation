@@ -49,14 +49,22 @@
     <!-- 1) Profit per SKU -->
     <div class="chart" id="profitByItem"></div>
 
-    <!-- 2) Sales per month (current year only) -->
+    <!-- 2) Sales per Month (current year only) -->
     <div class="chart" id="salesTrend"></div>
 
-    <!-- NEW: Pastel pies -->
+    <!-- Pastel pies -->
     <div class="chart" id="pieBrand"></div>
     <div class="chart" id="pieSupplier"></div>
 
-    <p class="note">Filter with search, Supplier, Brand. Sorting controls Profit per SKU order. Combined Sales = Internet + eBay. No data cleaning is performed.</p>
+    <!-- Brand Sales Summary visualisations (from raw SEPTCLER) -->
+    <div class="chart" id="brandTotalsBar"></div>
+    <div class="chart" id="brandMonthlyStacked"></div>
+    <div class="chart" id="brandProfitBar"></div>
+
+    <p class="note">
+      Filter with search, Supplier, and Brand. Sorting controls Profit per SKU order.
+      Combined Sales = Internet + eBay. No data cleaning is performed; everything is parsed in-memory from the original TASK export.
+    </p>
   </main>
 </body>
 </html>
