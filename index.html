@@ -2,14 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>TASK Stock & Sales Visualisation</title>
+  <title>TASK Export Visualisation</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="style.css" />
 
-  <!-- Libraries (CDN) -->
+  <!-- Libraries -->
   <script defer src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script defer src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0"></script>
 
   <script defer src="app.js"></script>
 </head>
@@ -27,24 +26,37 @@
       <input id="search" type="search" placeholder="Search Description / Stock Code…" />
       <select id="supplierFilter"><option value="">Supplier (All)</option></select>
       <select id="brandFilter"><option value="">Brand (All)</option></select>
+
+      <select id="sortBy">
+        <option value="profitDesc">Sort: Profit % (high→low)</option>
+        <option value="profitAsc">Sort: Profit % (low→high)</option>
+        <option value="brandAZ">Sort: Brand A→Z</option>
+        <option value="brandZA">Sort: Brand Z→A</option>
+        <option value="skuAZ">Sort: SKU A→Z</option>
+        <option value="skuZA">Sort: SKU Z→A</option>
+      </select>
     </div>
   </header>
 
   <main>
     <div id="kpis" class="kpis">
       <div class="kpi"><div class="kpi-value" id="kpiTotalSkus">–</div><div class="kpi-label">SKUs</div></div>
-      <div class="kpi"><div class="kpi-value" id="kpiStockValue">–</div><div class="kpi-label">Stock Value</div></div>
-      <div class="kpi"><div class="kpi-value" id="kpiAvgProfit">–</div><div class="kpi-label">Avg % Profit</div></div>
-      <div class="kpi"><div class="kpi-value" id="kpiSalesYTD">–</div><div class="kpi-label">Sales YTD</div></div>
+      <div class="kpi"><div class="kpi-value" id="kpiStockValue">–</div><div class="kpi-label">STOCK VALUE</div></div>
+      <div class="kpi"><div class="kpi-value" id="kpiAvgProfit">–</div><div class="kpi-label">AVG % PROFIT</div></div>
+      <div class="kpi"><div class="kpi-value" id="kpiSalesCombined">–</div><div class="kpi-label">COMBINED SALES (Internet + eBay)</div></div>
     </div>
 
+    <!-- 1) Profit per SKU -->
     <div class="chart" id="profitByItem"></div>
-    <div class="chart" id="stockVsDemand"></div>
-    <div class="chart" id="salesTrend"></div>
-    <div class="chart" id="profitDistribution"></div>
-    <div class="chart" id="supplierPerformance"></div>
 
-    <p class="note">Tip: filter with the search box (SKU or description), or by Supplier/Brand. All parsing happens in-memory. Your CSV content is not altered.</p>
+    <!-- 2) Sales per month (current year only) -->
+    <div class="chart" id="salesTrend"></div>
+
+    <!-- NEW: Pastel pies -->
+    <div class="chart" id="pieBrand"></div>
+    <div class="chart" id="pieSupplier"></div>
+
+    <p class="note">Filter with search, Supplier, Brand. Sorting controls Profit per SKU order. Combined Sales = Internet + eBay. No data cleaning is performed.</p>
   </main>
 </body>
 </html>
