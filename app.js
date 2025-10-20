@@ -368,4 +368,63 @@ function drawBrandRevenueBar(items){
     ...baseLayout,
     title:"Estimated Revenue by Brand (ex VAT)",
     xaxis:{automargin:true},
-    yaxis:{title:"£ ex VAT"}
+    yaxis:{title:"£ ex VAT"},
+    height: document.getElementById("brandRevenueBar").clientHeight
+  },{responsive:true});
+}
+
+// Top revenue SKUs
+function drawSkuRevenueTop(items){
+  const monthNames = monthColumns.map(m=>m.name);
+  const withRevenue = items.map(d=>({
+    sku: `${d.stockCode} — ${d.description}`,
+    brand: canonicalBrand(d.brand),
+    revenue: sum(monthNames.map(m=>d.monthsRevenue[m])),
+    lastInvoice: d.lastInvoice
+  })).filter(x=>Number.isFinite(x.revenue));
+
+  const top = withRevenue.sort((a,b)=>b.revenue-a.revenue).slice(0,100);
+  Plotly.newPlot("skuRevenueTop",[{
+    type:"bar",
+    x: top.map(t=>t.sku),
+    y: top.map(t=>t.revenue),
+    marker:{color: top.map((t,i)=>brandColour(t.brand,i))},
+    hovertemplate:"<b>%{x}</b><br>Est. Revenue: £%{y:,.0f}<extra></extra>"
+  }],{
+    ...baseLayout,
+    title:"Top 100 SKUs by Estimated Revenue (ex VAT)",
+    xaxis:{automargin:true, showticklabels:false},
+    yaxis:{title:"£ ex VAT"},
+    height: document.getElementById("skuRevenueTop").clientHeight
+  },{responsive:true});
+}
+
+/* ========= Last Invoice table ========= */
+function renderInvoiceTable(items){
+  const tbody = document.querySelector("#invoiceTable tbody");
+  tbody.innerHTML = "";
+  const rows = items.slice(0,200);
+  for(const d of rows){
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${d.stockCode}</td>
+      <td>${d.description}</td>
+      <td>${canonicalBrand(d.brand)}</td>
+      <td>${d.subCategory}</td>
+      <td>${fmtDateUK(d.lastInvoice)}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+/* ========= Events ========= */
+document.getElementById("file").addEventListener("change", e=>{
+  const f=e.target.files[0]; if(f) loadFromFile(f);
+});
+document.getElementById("loadSample").addEventListener("click", ()=>{
+  if(!BUILT_IN_CSV){ alert("Set BUILT_IN_CSV in app.js or use the file picker."); return; }
+  loadFromPath(BUILT_IN_CSV);
+});
+["search","brandFilter","subcatFilter","sortBy"].forEach(id=>{
+  document.getElementById(id).addEventListener("input", debounce(refresh,150));
+});
