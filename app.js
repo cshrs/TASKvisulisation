@@ -13,9 +13,9 @@ const BRAND_ALIASES = {
   "bosch":"Bosch","boschprofessional":"Bosch","boschaccessories":"Bosch",
   "hikoki":"HiKOKI","hi-koki":"HiKOKI","hikokipt":"HiKOKI",
   "hitachi":"HiKOKI","hitachipowertools":"HiKOKI",
-
-  // Other common brands (add as needed)
-  "einhell":"Einhell",
+  "everbuild":"Everbuild", // NEW: merge Everbuild variants
+  // Others
+  "einhell":"Einhell"
 };
 
 function canonicalBrand(name){
@@ -29,7 +29,8 @@ const brandColours = {
   "Makita": "#00a19b",
   "Bosch": "#1f6feb",
   "HiKOKI": "#0b8457",
-  "Einhell": "#cc0033"
+  "Einhell": "#cc0033",
+  "Everbuild": "#ff8c00" // orange
 };
 const fallbackColours = ["#6aa6ff","#ff9fb3","#90e0c5","#ffd08a","#c9b6ff","#8fd3ff","#ffc6a8","#b2e1a1","#f5b3ff","#a4b0ff"];
 function brandColour(name, i=0){ return brandColours[name] || fallbackColours[i % fallbackColours.length]; }
@@ -280,10 +281,8 @@ function refresh(){
 
   if (focus) {
     drawSkuFocusTrend(matches);
-    drawSkuFocusChannels(matches);
   } else {
     safeClear("skuFocusTrend");
-    safeClear("skuFocusChannels");
   }
 
   // Single-SKU detail card with invoice date
@@ -445,22 +444,47 @@ function drawSkuRevenueTop(items){
 }
 
 /* ========= SKU Focus (search 1–5 matches) ========= */
-function drawSkuFocusTrend(skus){
+// For each SKU, truncate months to the last month where units OR revenue > 0 to prevent odd tails.
+function truncatedMonthsForSku(d){
   const months = monthColumns.map(m=>m.name);
-  const unitTraces = skus.map((d,i)=>({
-    type:"bar",
-    name:`${d.stockCode}`,
-    x:months,
-    y:months.map(m => Number.isFinite(d.months[m]) ? d.months[m] : 0),
-    marker:{color: brandColour(d.brand,i)}
-  }));
-  const revTraces = skus.map((d)=>({
-    type:"scatter", mode:"lines+markers",
-    name:`£ Revenue — ${d.stockCode}`,
-    x:months,
-    y:months.map(m => Number.isFinite(d.monthsRevenue[m]) ? d.monthsRevenue[m] : 0),
-    yaxis:"y2"
-  }));
+  let last = -1;
+  for (let i = months.length - 1; i >= 0; i--) {
+    const u = d.months[months[i]];
+    const r = d.monthsRevenue[months[i]];
+    if ((Number.isFinite(u) && u > 0) || (Number.isFinite(r) && r > 0)) { last = i; break; }
+  }
+  const end = last >= 0 ? last + 1 : 0;
+  return months.slice(0, end);
+}
+
+function drawSkuFocusTrend(skus){
+  const unitTraces = [];
+  const revTraces = [];
+
+  skus.forEach((d,i)=>{
+    const months = truncatedMonthsForSku(d);
+    const units = months.map(m => Number.isFinite(d.months[m]) ? d.months[m] : 0);
+    const revs  = months.map(m => Number.isFinite(d.monthsRevenue[m]) ? d.monthsRevenue[m] : 0);
+
+    // Units bars for this SKU
+    unitTraces.push({
+      type:"bar",
+      name:`${d.stockCode} — Units`,
+      x:months,
+      y:units,
+      marker:{color: brandColour(d.brand,i)}
+    });
+
+    // Revenue line for this SKU (own x, own truncation)
+    revTraces.push({
+      type:"scatter",
+      mode:"lines+markers",
+      name:`£ Revenue — ${d.stockCode}`,
+      x:months,
+      y:revs,
+      yaxis:"y2"
+    });
+  });
 
   Plotly.newPlot("skuFocusTrend", [...unitTraces, ...revTraces], {
     ...baseLayout,
@@ -470,22 +494,6 @@ function drawSkuFocusTrend(skus){
     yaxis2:{title:"£ ex VAT", overlaying:"y", side:"right"},
     barmode: skus.length>1 ? "group" : "stack",
     height: document.getElementById("skuFocusTrend")?.clientHeight || 520
-  }, {responsive:true});
-}
-
-function drawSkuFocusChannels(skus){
-  const internet = sum(skus.map(d=>d.internetSales));
-  const ebay     = sum(skus.map(d=>d.ebaySales));
-  const labels = ["Internet","eBay"];
-  const values = [internet, ebay];
-
-  Plotly.newPlot("skuFocusChannels", [{
-    type:"pie", labels, values, hole:0.45, textinfo:"label+percent",
-    marker:{colors:["#6aa6ff","#ffd08a"]}
-  }], {
-    ...baseLayout,
-    title: skus.length===1 ? `Channel Share — ${skus[0].stockCode}` : "Channel Share — Selected SKUs",
-    height: document.getElementById("skuFocusChannels")?.clientHeight || 520
   }, {responsive:true});
 }
 
