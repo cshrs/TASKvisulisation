@@ -20,7 +20,9 @@
         <span>Choose CSV (raw export, unmodified)</span>
       </label>
 
-      <button id="loadSample" title="If you committed a CSV into the repo, set its filename in app.js">Load CSV from site</button>
+      <button id="loadSample" title="If you committed a CSV into the repo, set its filename in app.js">
+        Load CSV from site
+      </button>
 
       <input id="search" type="search" placeholder="Search Description / Stock Code…" />
       <select id="brandFilter"><option value="">Brand (All)</option></select>
@@ -47,16 +49,13 @@
       <div class="kpi"><div class="kpi-value" id="kpiRevenueYTD">–</div><div class="kpi-label">EST. REVENUE YTD (ex VAT)</div></div>
     </div>
 
-    <!-- Profit % by SKU -->
-    <div class="chart" id="profitByItem"></div>
-
-    <!-- Sales per Month (units) + Revenue per Month (line) + Cum. YTD -->
+    <!-- Sales per Month (units) + Revenue per Month (line) + Cum. YTD (truncated to last data month) -->
     <div class="chart" id="salesRevenueTrend"></div>
 
-    <!-- Pies / Brand distributions -->
-    <div class="chart" id="pieBrand"></div>
+    <!-- Revenue Share (Milwaukee / DeWalt / Makita / Bosch) -->
+    <div class="chart" id="brandRevShareFab4"></div>
 
-    <!-- Brand Sales Summary -->
+    <!-- Brand-level visuals -->
     <div class="chart" id="brandTotalsBar"></div>
     <div class="chart" id="brandMonthlyStacked"></div>
     <div class="chart" id="brandProfitBar"></div>
@@ -86,7 +85,7 @@
     </div>
 
     <p class="note">
-      Combined Sales = Internet Sales + eBay (as exported). Estimated Revenue uses <em>Sale Price Ex Vat × monthly units</em>.  
+      Combined Sales = Internet Sales + eBay (as exported). Estimated Revenue uses <em>Sale Price Ex Vat × monthly units</em>.
       Previous year month columns are ignored. All parsing is in-memory from the original TASK export.
     </p>
   </main>
