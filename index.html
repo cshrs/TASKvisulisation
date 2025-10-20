@@ -9,7 +9,6 @@
   <!-- Libraries -->
   <script defer src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script defer src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
-
   <script defer src="app.js"></script>
 </head>
 <body>
@@ -24,8 +23,8 @@
       <button id="loadSample" title="If you committed a CSV into the repo, set its filename in app.js">Load CSV from site</button>
 
       <input id="search" type="search" placeholder="Search Description / Stock Code…" />
-      <select id="supplierFilter"><option value="">Supplier (All)</option></select>
       <select id="brandFilter"><option value="">Brand (All)</option></select>
+      <select id="subcatFilter"><option value="">Sub Category (All)</option></select>
 
       <select id="sortBy">
         <option value="profitDesc">Sort: Profit % (high→low)</option>
@@ -52,18 +51,17 @@
     <!-- 2) Sales per Month (current year only) -->
     <div class="chart" id="salesTrend"></div>
 
-    <!-- Pastel pies -->
+    <!-- Pies (Brand only for accuracy with this export) -->
     <div class="chart" id="pieBrand"></div>
-    <div class="chart" id="pieSupplier"></div>
 
-    <!-- Brand Sales Summary visualisations (from raw SEPTCLER) -->
+    <!-- Brand Sales Summary (from raw SEPTCLER) -->
     <div class="chart" id="brandTotalsBar"></div>
     <div class="chart" id="brandMonthlyStacked"></div>
     <div class="chart" id="brandProfitBar"></div>
 
     <p class="note">
-      Filter with search, Supplier, and Brand. Sorting controls Profit per SKU order.
-      Combined Sales = Internet + eBay. No data cleaning is performed; everything is parsed in-memory from the original TASK export.
+      Filter with search, Brand, and Sub Category. Sorting controls the order in the Profit per SKU chart.
+      Combined Sales = Internet Sales + eBay (from the export). No data cleaning is performed; everything is parsed in-memory from the original TASK export.
     </p>
   </main>
 </body>

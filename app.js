@@ -1,26 +1,6 @@
 /* ========= Configuration ========= */
-const BUILT_IN_CSV = "SEPTCLER 1.csv"; // Commit your CSV to auto-load; set "" to disable
-
-// Column aliases (case-insensitive; tolerant of TASK header variations)
-const Aliases = {
-  stockCode: ["stock code"],
-  description: ["description"],
-  supplier: ["supplier", "buying"],
-  brand: ["brand", "manu"],
-  priceExVat: ["sale price ex vat", "online price ex vat", "online pr ex vat"],
-  salePrice: ["sale price", "online price", "online"],
-  cost: ["cost", "average cost price", "calculated cost", "calc cost"],
-  profitPct: ["% profit", "profit %", "calculated % profit"],
-  availableQty: ["available stock", "available", "stock", "quantity"],
-  stockValue: ["stock value", "available value", "value"],
-  ytdSales: ["sales year to date", "year to date", "ytd"],
-
-  internetSales: ["internet sales", "internet"],
-  ebaySales: ["ebay", "ebay sales"]
-};
-
-// Month-labelled columns (we’ll take the first 12 only = current year run)
-const MonthRegex = /(^|\s)(Aug|Sep|Oct|Nov|Dec|Jan|Feb|Mar|Apr|May|Jun|Jul)(\s|$)/i;
+// Commit your CSV to auto-load (or leave "" to force using the file picker)
+const BUILT_IN_CSV = "SEPTCLER 1.csv";
 
 /* ========= Pastel Plotly Theme ========= */
 const pastelColorway = [
@@ -38,49 +18,22 @@ const pastelLayout = {
 /* ========= State ========= */
 let rowsRaw = [];
 let headersRaw = [];
+let headers = [];
 let data = [];
 let headerMap = {};
-let monthColumns = []; // first 12 month-labelled columns only
+let monthColumns = []; // Aug..Jul only
 
-/* ========= Helpers ========= */
-function synthesiseHeader(rows) {
-  const depth = rows.length;
-  const width = Math.max(...rows.map(r => r.length));
-  const headers = [];
-  for (let c = 0; c < width; c++) {
-    const parts = [];
-    for (let r = 0; r < depth; r++) {
-      const cell = (rows[r] || [])[c] || "";
-      const s = String(cell).replace(/\r/g, "").trim();
-      if (s) parts.push(s);
-    }
-    headers.push(parts.join(" ").replace(/\s+/g, " ").trim());
-  }
-  return headers;
-}
-
-function findColIndex(headers, aliasList) {
-  const lower = headers.map(h => h.toLowerCase());
-  for (const alias of aliasList) {
-    const a = alias.toLowerCase();
-    const i = lower.findIndex(h => h.includes(a));
-    if (i !== -1) return i;
-  }
-  return -1;
-}
-
+/* ========= Utils ========= */
 function toNumber(v) {
   if (v === null || v === undefined) return NaN;
   const n = parseFloat(String(v).replace(/[,£%]/g, "").trim());
   return Number.isFinite(n) ? n : NaN;
 }
-
 function fmtGBP(n) {
   if (!Number.isFinite(n)) return "–";
   return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(n);
 }
-
-const debounce = (fn, ms = 200) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+const debounce = (fn, ms=200) => { let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; };
 
 /* ========= CSV Parsing ========= */
 function parseCSVText(csvText) {
@@ -88,86 +41,91 @@ function parseCSVText(csvText) {
     Papa.parse(csvText, {
       worker: true,
       skipEmptyLines: "greedy",
-      complete: results => resolve(results.data),
+      complete: res => resolve(res.data),
       error: reject
     });
   });
 }
-
 async function loadFromFile(file) {
   const text = await file.text();
   hydrate(await parseCSVText(text));
 }
-
 async function loadFromPath(path) {
   const res = await fetch(path);
-  if (!res.ok) throw new Error("Failed to fetch CSV from site");
+  if (!res.ok) throw new Error("Failed to fetch CSV");
   hydrate(await parseCSVText(await res.text()));
 }
 
-/* ========= Build Data from raw SEPTCLER ========= */
+/* ========= Build combined header (3 rows) ========= */
+function synthesiseHeader(rows) {
+  const depth = rows.length;
+  const width = Math.max(...rows.map(r => r.length));
+  const out = [];
+  for (let c = 0; c < width; c++) {
+    const parts = [];
+    for (let r = 0; r < depth; r++) {
+      const cell = (rows[r] || [])[c] || "";
+      const s = String(cell).replace(/\r/g, "").trim();
+      if (s) parts.push(s);
+    }
+    out.push(parts.join(" ").replace(/\s+/g, " ").trim());
+  }
+  return out;
+}
+
+/* ========= Hydrate from raw SEPTCLER ========= */
 function hydrate(arrayRows) {
   rowsRaw = arrayRows;
 
-  // TASK exports often have 3 header rows
-  const headerRowsGuess = 3;
-  headersRaw = rowsRaw.slice(0, headerRowsGuess);
-  const headers = synthesiseHeader(headersRaw);
+  const headerRows = 3; // TASK: 3 header rows
+  headersRaw = rowsRaw.slice(0, headerRows);
+  headers = synthesiseHeader(headersRaw);
+  const body = rowsRaw.slice(headerRows).filter(r => r && r.some(c => String(c).trim() !== ""));
 
-  const body = rowsRaw.slice(headerRowsGuess).filter(r => r && r.some(c => String(c).trim() !== ""));
+  // Exact mapping — verified from your sheet
+  const H = Object.fromEntries(headers.map((h,i)=>[h.trim(), i]));
+  const idx = (name) => (H[name] ?? -1);
 
   headerMap = {
-    stockCode:   findColIndex(headers, Aliases.stockCode),
-    description: findColIndex(headers, Aliases.description),
-    supplier:    findColIndex(headers, Aliases.supplier),
-    brand:       findColIndex(headers, Aliases.brand),
-    salePrice:   findColIndex(headers, Aliases.salePrice),
-    priceExVat:  findColIndex(headers, Aliases.priceExVat),
-    cost:        findColIndex(headers, Aliases.cost),
-    profitPct:   findColIndex(headers, Aliases.profitPct),
-    availableQty:findColIndex(headers, Aliases.availableQty),
-    stockValue:  findColIndex(headers, Aliases.stockValue),
-    ytdSales:    findColIndex(headers, Aliases.ytdSales),
-
-    internetSales: findColIndex(headers, Aliases.internetSales),
-    ebaySales:     findColIndex(headers, Aliases.ebaySales)
+    stockCode:   idx("Stock Code"),
+    description: idx("Description ..............."),
+    brand:       idx("Manu/ Brand"),
+    profitPct:   idx("Calculated % Profit"),
+    stockValue:  idx("Stock Value"),
+    internetSales: idx("Internet Sales"),
+    ebaySales:   idx("Ebay"),
+    amazonSales: idx("Amazon Sales"), // parsed but not used in Combined KPI
+    totalSales:  idx("Total"),
+    availableQty: idx("Available Stock No Van"),
+    availableVal: idx("Available Value No Van"),
+    subCategory: idx("Sub Category")
   };
 
-  // Detect month columns (first 12 only = current year)
-  const monthCandidates = headers.map((h, i) => ({ name: h, index: i })).filter(x => MonthRegex.test(x.name));
-  monthColumns = monthCandidates.slice(0, 12);
+  // Current year months strictly: Aug..Jul
+  const currentMonths = ["Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar","Apr","May","Jun","Jul"];
+  monthColumns = currentMonths
+    .map(m => ({ name: m, index: idx(m) }))
+    .filter(m => m.index >= 0);
 
+  // Build rows
   data = body.map(r => {
-    const price = headerMap.salePrice >= 0 ? toNumber(r[headerMap.salePrice]) :
-                  headerMap.priceExVat >= 0 ? toNumber(r[headerMap.priceExVat]) : NaN;
-    const cost  = headerMap.cost >= 0 ? toNumber(r[headerMap.cost]) : NaN;
-
-    const pctProvided = headerMap.profitPct >= 0 ? toNumber(r[headerMap.profitPct]) : NaN;
-    const profitPct = Number.isFinite(pctProvided)
-      ? pctProvided
-      : (Number.isFinite(price) && Number.isFinite(cost) && cost !== 0)
-        ? ((price - cost) / cost) * 100
-        : NaN;
+    const profitPct = headerMap.profitPct >= 0 ? toNumber(r[headerMap.profitPct]) : NaN;
+    const internet  = headerMap.internetSales >= 0 ? toNumber(r[headerMap.internetSales]) : 0;
+    const ebay      = headerMap.ebaySales     >= 0 ? toNumber(r[headerMap.ebaySales])     : 0;
 
     const months = {};
     monthColumns.forEach(({ name, index }) => { months[name] = toNumber(r[index]); });
 
-    const internet = headerMap.internetSales >= 0 ? toNumber(r[headerMap.internetSales]) : 0;
-    const ebay     = headerMap.ebaySales >= 0 ? toNumber(r[headerMap.ebaySales]) : 0;
-
     return {
-      stockCode:    headerMap.stockCode >= 0 ? String(r[headerMap.stockCode] ?? "").trim() : "",
-      description:  headerMap.description >= 0 ? String(r[headerMap.description] ?? "").trim() : "",
-      supplier:     headerMap.supplier >= 0 ? String(r[headerMap.supplier] ?? "").trim() : "",
-      brand:        headerMap.brand >= 0 ? String(r[headerMap.brand] ?? "").trim() : "",
-      priceExVat:   price,
-      cost,
+      stockCode:   headerMap.stockCode   >= 0 ? String(r[headerMap.stockCode] ?? "").trim() : "",
+      description: headerMap.description >= 0 ? String(r[headerMap.description] ?? "").trim() : "",
+      brand:       headerMap.brand       >= 0 ? String(r[headerMap.brand] ?? "").trim() : "",
+      subCategory: headerMap.subCategory >= 0 ? String(r[headerMap.subCategory] ?? "").trim() : "",
       profitPct,
-      availableQty: headerMap.availableQty >= 0 ? toNumber(r[headerMap.availableQty]) : NaN,
-      stockValue:   headerMap.stockValue >= 0 ? toNumber(r[headerMap.stockValue]) : NaN,
+      stockValue:  headerMap.stockValue  >= 0 ? toNumber(r[headerMap.stockValue]) : NaN,
       months,
       internetSales: internet,
-      ebaySales: ebay,
+      ebaySales:     ebay,
       combinedSales: internet + ebay
     };
   });
@@ -182,24 +140,24 @@ function uniqueSorted(arr) {
 }
 
 function populateFilters() {
-  const supplierSel = document.getElementById("supplierFilter");
   const brandSel = document.getElementById("brandFilter");
+  const subSel   = document.getElementById("subcatFilter");
 
-  supplierSel.length = 1; // keep placeholder
-  brandSel.length = 1;
+  brandSel.length = 1; // reset (keep placeholder)
+  subSel.length   = 1;
 
-  uniqueSorted(data.map(d => d.supplier)).forEach(s => supplierSel.add(new Option(s, s)));
-  uniqueSorted(data.map(d => d.brand)).forEach(b => brandSel.add(new Option(b, b)));
+  uniqueSorted(data.map(d => d.brand)).forEach(v => brandSel.add(new Option(v, v)));
+  uniqueSorted(data.map(d => d.subCategory)).forEach(v => subSel.add(new Option(v, v)));
 }
 
 function currentFiltered() {
-  const q = document.getElementById("search").value.trim().toLowerCase();
-  const sup = document.getElementById("supplierFilter").value;
-  const br = document.getElementById("brandFilter").value;
+  const q   = document.getElementById("search").value.trim().toLowerCase();
+  const br  = document.getElementById("brandFilter").value;
+  const sub = document.getElementById("subcatFilter").value;
 
   return data.filter(d => {
-    if (sup && d.supplier !== sup) return false;
-    if (br && d.brand !== br) return false;
+    if (br  && d.brand !== br) return false;
+    if (sub && d.subCategory !== sub) return false;
     if (q) {
       const hay = (d.description + " " + d.stockCode).toLowerCase();
       if (!hay.includes(q)) return false;
@@ -246,20 +204,21 @@ function refresh() {
   drawProfitPerSKU(sortItems(items));
   drawMonthlySales(items);
   drawPieByBrand(items);
-  drawPieBySupplier(items);
   drawBrandTotalsBar(items);
   drawBrandMonthlyStacked(items);
   drawBrandProfitBar(items);
+
+  // Optional: audit mapping in console
+  // console.table(headerMap); console.log("Months:", monthColumns.map(m=>m.name).join(", "));
 }
 
-/* ========= Brand Sales Summary (from raw SEPTCLER) ========= */
+/* ========= Brand summary from raw SEPTCLER ========= */
 function summariseByBrand(items) {
-  const byBrand = new Map();
-
+  const by = new Map();
   for (const d of items) {
     const k = d.brand || "Unknown";
-    if (!byBrand.has(k)) {
-      byBrand.set(k, {
+    if (!by.has(k)) {
+      by.set(k, {
         brand: k,
         combinedSales: 0,
         stockValue: 0,
@@ -268,39 +227,31 @@ function summariseByBrand(items) {
         months: Object.fromEntries(monthColumns.map(c => [c.name, 0]))
       });
     }
-    const b = byBrand.get(k);
-
+    const b = by.get(k);
     if (Number.isFinite(d.combinedSales)) b.combinedSales += d.combinedSales;
-    if (Number.isFinite(d.stockValue)) b.stockValue += d.stockValue;
-
-    if (Number.isFinite(d.profitPct)) {
-      b.profitSum += d.profitPct;
-      b.profitCount += 1;
-    }
+    if (Number.isFinite(d.stockValue))    b.stockValue    += d.stockValue;
+    if (Number.isFinite(d.profitPct)) { b.profitSum += d.profitPct; b.profitCount += 1; }
     for (const { name } of monthColumns) {
       const v = d.months[name];
       if (Number.isFinite(v)) b.months[name] += v;
     }
   }
-
-  const rows = Array.from(byBrand.values()).map(r => ({
+  const rows = Array.from(by.values()).map(r => ({
     brand: r.brand,
     combinedSales: r.combinedSales,
     stockValue: r.stockValue,
     avgProfitPct: r.profitCount ? r.profitSum / r.profitCount : NaN,
     months: r.months
   }));
-
-  rows.sort((a, b) => b.combinedSales - a.combinedSales);
+  rows.sort((a,b)=> b.combinedSales - a.combinedSales);
   return rows;
 }
 
 /* ========= Charts ========= */
 
-// 1) Profit per SKU
+// Profit per SKU
 function drawProfitPerSKU(items) {
   const top = items.filter(d => Number.isFinite(d.profitPct)).slice(0, 200);
-
   Plotly.newPlot("profitByItem", [{
     type: "bar",
     x: top.map(d => `${d.stockCode} — ${d.description}`),
@@ -312,86 +263,54 @@ function drawProfitPerSKU(items) {
     xaxis: { automargin: true, showticklabels: false },
     yaxis: { title: "% Profit" },
     height: document.getElementById("profitByItem").clientHeight
-  }, {responsive: true});
+  }, { responsive: true });
 }
 
-// 2) Sales per Month (current year only)
+// Sales per Month (current year only)
 function drawMonthlySales(items) {
   const names = monthColumns.map(c => c.name);
   const sums = names.map(m => items.reduce((s,d)=> s + (Number.isFinite(d.months[m]) ? d.months[m] : 0), 0));
-
   Plotly.newPlot("salesTrend", [{
-    type: "scatter",
-    mode: "lines+markers",
-    x: names,
-    y: sums,
-    hovertemplate: "%{x}: %{y:.0f}<extra></extra>"
+    type: "scatter", mode: "lines+markers",
+    x: names, y: sums, hovertemplate: "%{x}: %{y:.0f}<extra></extra>"
   }], {
     ...pastelLayout,
     title: "Sales per Month (current year)",
     xaxis: { tickangle: -45, automargin: true },
     yaxis: { title: "Units / Value (as exported)" },
     height: document.getElementById("salesTrend").clientHeight
-  }, {responsive: true});
+  }, { responsive: true });
 }
 
-// 3) Pie — Sales by Brand
+// Pie — Combined Sales by Brand
 function drawPieByBrand(items) {
   const byBrand = {};
   for (const d of items) {
     const k = d.brand || "Unknown";
     byBrand[k] = (byBrand[k] || 0) + (Number.isFinite(d.combinedSales) ? d.combinedSales : 0);
   }
-  const entries = Object.entries(byBrand).sort((a,b)=> b[1]-a[1]);
+  const entries = Object.entries(byBrand).sort((a,b)=> b[1] - a[1]);
   const top = entries.slice(0, 10);
-  const other = entries.slice(10).reduce((s,[,v])=> s+v, 0);
+  const other = entries.slice(10).reduce((s,[,v])=> s + v, 0);
   const labels = [...top.map(([k])=>k), ...(other>0?["Other"]:[])];
   const values = [...top.map(([,v])=>v), ...(other>0?[other]:[])];
 
   Plotly.newPlot("pieBrand", [{
-    type: "pie",
-    labels, values, hole: 0.45, textinfo: "label+percent"
+    type: "pie", labels, values, hole: 0.45, textinfo: "label+percent"
   }], {
     ...pastelLayout,
-    title: "Combined Sales Share by Brand",
+    title: "Combined Sales Share by Brand (Internet + eBay)",
     height: document.getElementById("pieBrand").clientHeight
-  }, {responsive: true});
+  }, { responsive: true });
 }
 
-// 4) Pie — Sales by Supplier
-function drawPieBySupplier(items) {
-  const bySup = {};
-  for (const d of items) {
-    const k = d.supplier || "Unknown";
-    bySup[k] = (bySup[k] || 0) + (Number.isFinite(d.combinedSales) ? d.combinedSales : 0);
-  }
-  const entries = Object.entries(bySup).sort((a,b)=> b[1]-a[1]);
-  const top = entries.slice(0, 10);
-  const other = entries.slice(10).reduce((s,[,v])=> s+v, 0);
-  const labels = [...top.map(([k])=>k), ...(other>0?["Other"]:[])];
-  const values = [...top.map(([,v])=>v), ...(other>0?[other]:[])];
-
-  Plotly.newPlot("pieSupplier", [{
-    type: "pie",
-    labels, values, hole: 0.45, textinfo: "label+percent"
-  }], {
-    ...pastelLayout,
-    title: "Combined Sales Share by Supplier",
-    height: document.getElementById("pieSupplier").clientHeight
-  }, {responsive: true});
-}
-
-/* ========= Brand Sales Summary visualisations ========= */
-
-// A) Combined Sales by Brand (Top 15)
+// Brand totals — Combined Sales (Top 15)
 function drawBrandTotalsBar(items) {
-  const brandRows = summariseByBrand(items);
-  const top = brandRows.slice(0, 15);
-
+  const rows = summariseByBrand(items).slice(0, 15);
   Plotly.newPlot("brandTotalsBar", [{
     type: "bar",
-    x: top.map(r => r.brand),
-    y: top.map(r => r.combinedSales),
+    x: rows.map(r => r.brand),
+    y: rows.map(r => r.combinedSales),
     hovertemplate: "<b>%{x}</b><br>Combined Sales: %{y:,}<extra></extra>"
   }], {
     ...pastelLayout,
@@ -402,18 +321,13 @@ function drawBrandTotalsBar(items) {
   }, { responsive: true });
 }
 
-// B) Monthly Stacked Sales by Brand (Top 10)
+// Brand monthly stacked (Top 10 by Combined Sales)
 function drawBrandMonthlyStacked(items) {
-  const brandRows = summariseByBrand(items).slice(0, 10);
+  const rows = summariseByBrand(items).slice(0, 10);
   const months = monthColumns.map(c => c.name);
-
-  const traces = brandRows.map(r => ({
-    type: "bar",
-    name: r.brand,
-    x: months,
-    y: months.map(m => r.months[m]),
+  const traces = rows.map(r => ({
+    type: "bar", name: r.brand, x: months, y: months.map(m => r.months[m])
   }));
-
   Plotly.newPlot("brandMonthlyStacked", traces, {
     ...pastelLayout,
     barmode: "stack",
@@ -424,14 +338,13 @@ function drawBrandMonthlyStacked(items) {
   }, { responsive: true });
 }
 
-// C) Average % Profit by Brand (Top 15 by sales)
+// Brand average % profit (Top 15)
 function drawBrandProfitBar(items) {
-  const brandRows = summariseByBrand(items).slice(0, 15);
-
+  const rows = summariseByBrand(items).slice(0, 15);
   Plotly.newPlot("brandProfitBar", [{
     type: "bar",
-    x: brandRows.map(r => r.brand),
-    y: brandRows.map(r => r.avgProfitPct),
+    x: rows.map(r => r.brand),
+    y: rows.map(r => r.avgProfitPct),
     hovertemplate: "<b>%{x}</b><br>Avg % Profit: %{y:.1f}%<extra></extra>"
   }], {
     ...pastelLayout,
@@ -450,6 +363,6 @@ document.getElementById("loadSample").addEventListener("click", () => {
   if (!BUILT_IN_CSV) { alert("Set BUILT_IN_CSV in app.js or use the file picker."); return; }
   loadFromPath(BUILT_IN_CSV);
 });
-["search","supplierFilter","brandFilter","sortBy"].forEach(id => {
+["search","brandFilter","subcatFilter","sortBy"].forEach(id => {
   document.getElementById(id).addEventListener("input", debounce(refresh, 150));
 });
