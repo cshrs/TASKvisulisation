@@ -38,30 +38,56 @@
   </header>
 
   <main>
+    <!-- KPIs -->
     <div id="kpis" class="kpis">
       <div class="kpi"><div class="kpi-value" id="kpiTotalSkus">–</div><div class="kpi-label">SKUs</div></div>
       <div class="kpi"><div class="kpi-value" id="kpiStockValue">–</div><div class="kpi-label">STOCK VALUE</div></div>
       <div class="kpi"><div class="kpi-value" id="kpiAvgProfit">–</div><div class="kpi-label">AVG % PROFIT</div></div>
       <div class="kpi"><div class="kpi-value" id="kpiSalesCombined">–</div><div class="kpi-label">COMBINED SALES (Internet + eBay)</div></div>
+      <div class="kpi"><div class="kpi-value" id="kpiRevenueYTD">–</div><div class="kpi-label">EST. REVENUE YTD (ex VAT)</div></div>
     </div>
 
-    <!-- 1) Profit per SKU -->
+    <!-- Profit % by SKU -->
     <div class="chart" id="profitByItem"></div>
 
-    <!-- 2) Sales per Month (current year only) -->
-    <div class="chart" id="salesTrend"></div>
+    <!-- Sales per Month (units) + Revenue per Month (line) + Cum. YTD -->
+    <div class="chart" id="salesRevenueTrend"></div>
 
-    <!-- Pies (Brand only for accuracy with this export) -->
+    <!-- Pies / Brand distributions -->
     <div class="chart" id="pieBrand"></div>
 
-    <!-- Brand Sales Summary (from raw SEPTCLER) -->
+    <!-- Brand Sales Summary -->
     <div class="chart" id="brandTotalsBar"></div>
     <div class="chart" id="brandMonthlyStacked"></div>
     <div class="chart" id="brandProfitBar"></div>
+    <div class="chart" id="brandRevenueBar"></div>
+
+    <!-- Top Revenue SKUs -->
+    <div class="chart" id="skuRevenueTop"></div>
+
+    <!-- Last Invoice Dates (table) -->
+    <div class="table-card">
+      <h2>Last Invoice Date (per SKU)</h2>
+      <div class="table-wrap">
+        <table id="invoiceTable">
+          <thead>
+            <tr>
+              <th>Stock Code</th>
+              <th>Description</th>
+              <th>Brand</th>
+              <th>Sub Category</th>
+              <th>Last Invoice Date</th>
+            </tr>
+          </thead>
+          <tbody><!-- populated dynamically --></tbody>
+        </table>
+      </div>
+      <div class="note">Showing the first 200 filtered SKUs.</div>
+    </div>
 
     <p class="note">
-      Filter with search, Brand, and Sub Category. Sorting controls the order in the Profit per SKU chart.
-      Combined Sales = Internet Sales + eBay (from the export). No data cleaning is performed; everything is parsed in-memory from the original TASK export.
+      Combined Sales = Internet Sales + eBay (as exported). Estimated Revenue uses <em>Sale Price Ex Vat × monthly units</em>.  
+      Previous year month columns are ignored. All parsing is in-memory from the original TASK export.
     </p>
   </main>
 </body>

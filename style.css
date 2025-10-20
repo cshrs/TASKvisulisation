@@ -74,6 +74,17 @@ main{padding:24px; overflow-y:auto; scroll-behavior:smooth}
   flex:1 1 auto; width:100% !important; height:100% !important; overflow:visible !important;
 }
 
+/* Table card */
+.table-card{
+  background:var(--card); border:1px solid var(--border); border-radius:18px;
+  padding:16px; margin-bottom:28px; box-shadow:0 10px 24px rgba(0,0,0,.05);
+}
+.table-card h2{margin:0 0 12px}
+.table-wrap{overflow:auto; border:1px solid var(--border); border-radius:12px}
+table{border-collapse:collapse; width:100%; min-width:760px}
+th, td{padding:10px 12px; border-bottom:1px solid var(--border); text-align:left; white-space:nowrap}
+thead th{position:sticky; top:0; background:#f7f8ff; z-index:1}
+
 /* Responsive */
 @media (max-width:1024px){ .chart{height:460px} }
 @media (max-width:800px){
