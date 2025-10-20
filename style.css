@@ -1,17 +1,17 @@
 :root{
   --gap:16px;
-  --bg:#fbfbfd;                 /* light pastel canvas */
-  --card:#ffffff;               /* white cards */
-  --text:#2a2a33;               /* soft charcoal */
-  --muted:#7c8591;              /* cool grey */
+  --bg:#fbfbfd;
+  --card:#ffffff;
+  --text:#2a2a33;
+  --muted:#7c8591;
   --border:#e7e9f2;
 
   /* accent pastels */
-  --accent:#6aa6ff;   /* cornflower */
-  --accent-2:#ff9fb3; /* rose */
-  --accent-3:#90e0c5; /* mint */
-  --accent-4:#ffd08a; /* apricot */
-  --accent-5:#c9b6ff; /* lilac */
+  --accent:#6aa6ff;
+  --accent-2:#ff9fb3;
+  --accent-3:#90e0c5;
+  --accent-4:#ffd08a;
+  --accent-5:#c9b6ff;
 }
 
 *{box-sizing:border-box}

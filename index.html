@@ -54,6 +54,8 @@
     <div class="chart" id="brandTotalsBar"></div>
     <div class="chart" id="brandMonthlyStacked"></div>
     <div class="chart" id="brandRevenueBar"></div>
+    <div class="chart" id="brandTop10OrderShare"></div>
+    <div class="chart" id="brandTop10RevenueShare"></div>
     <div class="chart" id="skuRevenueTop"></div>
 
     <!-- SKU focus: appears only when search matches 1–5 SKUs -->
@@ -91,8 +93,8 @@
     </div>
 
     <p class="note">
-      Combined Sales = Internet Sales + eBay (as exported). Estimated Revenue uses <em>Sale Price Ex Vat × monthly units</em>.
-      Previous year month columns are ignored. All parsing is in-memory from the original TASK export.
+      Estimated Revenue = <em>(Sale Price Ex VAT if present, else Online Price Ex VAT)</em> × <em>monthly units</em>.  
+      Combined Sales = Internet Sales + eBay (as exported). Previous year columns are ignored. Parsing is 100% in-memory from the original TASK export.
     </p>
   </main>
 </body>

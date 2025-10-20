@@ -6,7 +6,7 @@ const normKey = s => String(s||"").toLowerCase().replace(/[^a-z0-9]+/g,"");
 
 // Extend this list as you see more variants in your exports
 const BRAND_ALIASES = {
-  // Priority brands (canonical → label)
+  // Priority brands
   "milwaukee":"Milwaukee",
   "dewalt":"DeWalt","de-walt":"DeWalt",
   "makita":"Makita",
@@ -14,7 +14,7 @@ const BRAND_ALIASES = {
   "hikoki":"HiKOKI","hi-koki":"HiKOKI","hikokipt":"HiKOKI",
   "hitachi":"HiKOKI","hitachipowertools":"HiKOKI",
   "everbuild":"Everbuild",
-  "ndurance":"N-Durance", // NEW: merges “N-Durance”, “N-DURANCE”, etc.
+  "ndurance":"N-Durance",
 
   // Others (add as needed)
   "einhell":"Einhell"
@@ -33,7 +33,7 @@ const brandColours = {
   "HiKOKI": "#0b8457",
   "Einhell": "#cc0033",
   "Everbuild": "#ff8c00",
-  "N-Durance": "#7d5cff" // pastel purple
+  "N-Durance": "#7d5cff"
 };
 const fallbackColours = ["#6aa6ff","#ff9fb3","#90e0c5","#ffd08a","#c9b6ff","#8fd3ff","#ffc6a8","#b2e1a1","#f5b3ff","#a4b0ff"];
 function brandColour(name, i=0){ return brandColours[name] || fallbackColours[i % fallbackColours.length]; }
@@ -71,7 +71,7 @@ function parseCSVText(csvText){
 async function loadFromFile(file){ const txt=await file.text(); hydrate(await parseCSVText(txt)); }
 async function loadFromPath(path){ const r=await fetch(path); if(!r.ok) throw new Error("Fetch CSV failed"); hydrate(await parseCSVText(await r.text())); }
 
-/* ========= Build combined header (3 rows) ========= */
+/* ========= Header helpers ========= */
 function synthesiseHeader(rows){
   const depth = rows.length, width = Math.max(...rows.map(r=>r.length));
   const out=[];
@@ -81,6 +81,14 @@ function synthesiseHeader(rows){
   }
   return out;
 }
+function findHeaderIndex(tokens){
+  const need = tokens.map(t=>t.toLowerCase());
+  for (let i=0;i<headers.length;i++){
+    const h = headers[i].toLowerCase();
+    if (need.every(n => h.includes(n))) return i;
+  }
+  return -1;
+}
 
 /* ========= Hydrate from raw SEPTCLER ========= */
 function hydrate(arrayRows){
@@ -89,10 +97,11 @@ function hydrate(arrayRows){
   headers = synthesiseHeader(headersRaw);
   const body = arrayRows.slice(headerRows).filter(r => r && r.some(c => String(c).trim() !== ""));
 
-  // Exact mapping (verified from your export)
+  // Primary mapping
   const H = Object.fromEntries(headers.map((h,i)=>[h.trim(), i]));
   const idx = (name) => (H[name] ?? -1);
 
+  // known / fuzzy header map
   headerMap = {
     stockCode:     idx("Stock Code"),
     description:   idx("Description ..............."),
@@ -105,41 +114,50 @@ function hydrate(arrayRows){
     totalSales:    idx("Total"),
     subCategory:   idx("Sub Category"),
     lastInvoice:   idx("Last Invoice Date"),
-    salePriceExVat:idx("Sale Price Ex Vat")
+    salePriceExVat: idx("Sale Price Ex Vat") !== -1 ? idx("Sale Price Ex Vat") : findHeaderIndex(["sale","price","ex","vat"]),
+    onlinePriceExVat: findHeaderIndex(["online","price","ex","vat"]) // fuzzy
   };
 
   // Current-year months strictly: Aug..Jul
   const monthsList = ["Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar","Apr","May","Jun","Jul"];
-  monthColumns = monthsList.map(m => ({name:m, index: idx(m)})).filter(m => m.index >= 0);
+  monthColumns = monthsList.map(m => ({name:m, index: (H[m] ?? -1)})).filter(m => m.index >= 0);
 
-  // Build dataset rows (brand normalised)
+  // Build dataset rows
   data = body.map(r=>{
-    const priceEx   = headerMap.salePriceExVat>=0 ? toNumber(r[headerMap.salePriceExVat]) : NaN;
+    const salePrice  = headerMap.salePriceExVat>=0 ? toNumber(r[headerMap.salePriceExVat]) : NaN;
+    const onlinePrice= headerMap.onlinePriceExVat>=0 ? toNumber(r[headerMap.onlinePriceExVat]) : NaN;
+    const priceBasis = Number.isFinite(salePrice) && salePrice>0 ? salePrice :
+                       (Number.isFinite(onlinePrice) && onlinePrice>0 ? onlinePrice : NaN);
+
     const months={}, monthsRevenue={};
     monthColumns.forEach(({name,index})=>{
       const units = toNumber(r[index]);
       months[name] = units;
-      monthsRevenue[name] = (Number.isFinite(units) && Number.isFinite(priceEx)) ? (units * priceEx) : NaN;
+      monthsRevenue[name] = (Number.isFinite(units) && Number.isFinite(priceBasis)) ? (units * priceBasis) : NaN;
     });
 
     const brandRaw = headerMap.brand>=0 ? String(r[headerMap.brand]??"").trim() : "";
     const brand = canonicalBrand(brandRaw);
 
+    const internetSales = headerMap.internetSales>=0 ? toNumber(r[headerMap.internetSales]) : 0;
+    const ebaySales     = headerMap.ebaySales>=0 ? toNumber(r[headerMap.ebaySales]) : 0;
+
     return {
-      stockCode:   headerMap.stockCode>=0 ? String(r[headerMap.stockCode]??"").trim() : "",
-      description: headerMap.description>=0 ? String(r[headerMap.description]??"").trim() : "",
+      stockCode:     headerMap.stockCode>=0 ? String(r[headerMap.stockCode]??"").trim() : "",
+      description:   headerMap.description>=0 ? String(r[headerMap.description]??"").trim() : "",
       brand,
-      subCategory: headerMap.subCategory>=0 ? String(r[headerMap.subCategory]??"").trim() : "",
-      profitPct:   headerMap.profitPct>=0 ? toNumber(r[headerMap.profitPct]) : NaN,
-      stockValue:  headerMap.stockValue>=0 ? toNumber(r[headerMap.stockValue]) : NaN,
+      subCategory:   headerMap.subCategory>=0 ? String(r[headerMap.subCategory]??"").trim() : "",
+      profitPct:     headerMap.profitPct>=0 ? toNumber(r[headerMap.profitPct]) : NaN,
+      stockValue:    headerMap.stockValue>=0 ? toNumber(r[headerMap.stockValue]) : NaN,
       months,
       monthsRevenue,
-      internetSales: headerMap.internetSales>=0 ? toNumber(r[headerMap.internetSales]) : 0,
-      ebaySales:     headerMap.ebaySales>=0 ? toNumber(r[headerMap.ebaySales]) : 0,
-      priceExVat:    priceEx,
+      priceBasis,
+      internetSales,
+      ebaySales,
+      combinedSales: (Number.isFinite(internetSales)?internetSales:0) + (Number.isFinite(ebaySales)?ebaySales:0),
       lastInvoice:   headerMap.lastInvoice>=0 ? r[headerMap.lastInvoice] : ""
     };
-  }).map(d => ({ ...d, combinedSales: (Number.isFinite(d.internetSales)?d.internetSales:0) + (Number.isFinite(d.ebaySales)?d.ebaySales:0) }));
+  });
 
   populateFilters();
   refresh();
@@ -148,7 +166,6 @@ function hydrate(arrayRows){
 /* ========= Filtering ========= */
 function uniqueSorted(arr){ return [...new Set(arr.filter(Boolean))].sort((a,b)=>a.localeCompare(b)); }
 
-// Global items for dashboards (ignore free-text search)
 function baseItemsForAggregates(){
   const br  = document.getElementById("brandFilter").value;
   const sub = document.getElementById("subcatFilter").value;
@@ -158,13 +175,10 @@ function baseItemsForAggregates(){
     return true;
   });
 }
-
-// Items that apply the search (used for SKU focus + invoice table)
 function itemsWithSearch(){
   const q   = document.getElementById("search").value.trim().toLowerCase();
   const br  = document.getElementById("brandFilter").value;
   const sub = document.getElementById("subcatFilter").value;
-
   return data.filter(d=>{
     if (br  && d.brand !== br) return false;
     if (sub && d.subCategory !== sub) return false;
@@ -175,17 +189,15 @@ function itemsWithSearch(){
     return true;
   });
 }
-
 function populateFilters(){
   const brandSel = document.getElementById("brandFilter");
   const subSel   = document.getElementById("subcatFilter");
   brandSel.length = 1; subSel.length = 1;
-
   uniqueSorted(data.map(d=>d.brand)).forEach(v=> brandSel.add(new Option(v, v)));
   uniqueSorted(data.map(d=>d.subCategory)).forEach(v=> subSel.add(new Option(v, v)));
 }
 
-/* ========= Sorting (for table/top SKUs) ========= */
+/* ========= Sorting ========= */
 function sortItems(items){
   const how = document.getElementById("sortBy").value;
   const arr=[...items];
@@ -234,9 +246,10 @@ function summariseByBrand(items){
     b.combinedSales += Number.isFinite(d.combinedSales)? d.combinedSales : 0;
     b.stockValue    += Number.isFinite(d.stockValue)? d.stockValue : 0;
     if (Number.isFinite(d.profitPct)){ b.profitSum += d.profitPct; b.profitCount += 1; }
+    // monthly revenue (price-basis × month units)
     for (const {name} of monthColumns){
       const r=d.monthsRevenue[name];
-      b.months[name] += Number.isFinite(r)? r : 0; // revenue per month
+      b.months[name] += Number.isFinite(r)? r : 0;
     }
     b.revenue += sum(Object.values(d.monthsRevenue));
   }
@@ -275,6 +288,8 @@ function refresh(){
   drawBrandTotalsBar(itemsAgg);
   drawBrandMonthlyStacked(itemsAgg);
   drawBrandRevenueBar(itemsAgg);
+  drawBrandTop10OrderShare(itemsAgg);
+  drawBrandTop10RevenueShare(itemsAgg);
   drawSkuRevenueTop(itemsAgg);
 
   // SKU focus area (appears on 1–5 matches)
@@ -402,7 +417,7 @@ function drawBrandMonthlyStacked(items){
   },{responsive:true});
 }
 
-// Global — Brand revenue bar
+// Global — Brand revenue bar (ex VAT, monthly-units × price-basis)
 function drawBrandRevenueBar(items){
   const rows = summariseByBrand(items).slice(0,15);
   Plotly.newPlot("brandRevenueBar",[{
@@ -420,13 +435,53 @@ function drawBrandRevenueBar(items){
   },{responsive:true});
 }
 
-// Global — Top revenue SKUs
+// NEW — Top 10 Brands: Order Share (Internet + eBay units)
+function drawBrandTop10OrderShare(items){
+  const rows = summariseByBrand(items)
+    .filter(r => Number.isFinite(r.combinedSales) && r.combinedSales > 0)
+    .sort((a,b)=> b.combinedSales - a.combinedSales)
+    .slice(0,10);
+
+  Plotly.newPlot("brandTop10OrderShare",[{
+    type:"pie",
+    labels: rows.map(r=>r.brand),
+    values: rows.map(r=>r.combinedSales),
+    hole: 0.45,
+    textinfo:"label+percent",
+    marker:{colors: rows.map((r,i)=>brandColour(r.brand,i))}
+  }],{
+    ...baseLayout,
+    title:"Top 10 Brands — Order Share (Internet + eBay units)"
+  },{responsive:true});
+}
+
+// NEW — Top 10 Brands: Revenue Share (ex VAT)
+function drawBrandTop10RevenueShare(items){
+  const rows = summariseByBrand(items)
+    .filter(r => Number.isFinite(r.revenue) && r.revenue > 0)
+    .sort((a,b)=> b.revenue - a.revenue)
+    .slice(0,10);
+
+  Plotly.newPlot("brandTop10RevenueShare",[{
+    type:"pie",
+    labels: rows.map(r=>r.brand),
+    values: rows.map(r=>r.revenue),
+    hole: 0.45,
+    textinfo:"label+percent",
+    marker:{colors: rows.map((r,i)=>brandColour(r.brand,i))}
+  }],{
+    ...baseLayout,
+    title:"Top 10 Brands — Revenue Share (ex VAT)"
+  },{responsive:true});
+}
+
+// Global — Top revenue SKUs (ex VAT)
 function drawSkuRevenueTop(items){
-  const monthNames = monthColumns.map(m=>m.name);
+  const months = monthColumns.map(m=>m.name);
   const withRevenue = items.map(d=>({
     sku: `${d.stockCode} — ${d.description}`,
     brand: d.brand,
-    revenue: sum(monthNames.map(m=>d.monthsRevenue[m])),
+    revenue: sum(months.map(m=>d.monthsRevenue[m])),
     lastInvoice: d.lastInvoice
   })).filter(x=>Number.isFinite(x.revenue));
 
@@ -447,7 +502,6 @@ function drawSkuRevenueTop(items){
 }
 
 /* ========= SKU Focus (search 1–5 matches) ========= */
-// For each SKU, truncate months to the last month where units OR revenue > 0 to prevent odd tails.
 function truncatedMonthsForSku(d){
   const months = monthColumns.map(m=>m.name);
   let last = -1;
@@ -469,7 +523,6 @@ function drawSkuFocusTrend(skus){
     const units = months.map(m => Number.isFinite(d.months[m]) ? d.months[m] : 0);
     const revs  = months.map(m => Number.isFinite(d.monthsRevenue[m]) ? d.monthsRevenue[m] : 0);
 
-    // Units bars for this SKU
     unitTraces.push({
       type:"bar",
       name:`${d.stockCode} — Units`,
@@ -478,7 +531,6 @@ function drawSkuFocusTrend(skus){
       marker:{color: brandColour(d.brand,i)}
     });
 
-    // Revenue line for this SKU (own x, own truncation)
     revTraces.push({
       type:"scatter",
       mode:"lines+markers",
