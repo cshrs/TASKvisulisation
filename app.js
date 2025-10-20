@@ -1,18 +1,15 @@
 /* ========= Configuration ========= */
 const BUILT_IN_CSV = "SEPTCLER 1.csv"; // set "" to disable auto-load
 
-/* ========= Brand colours (priority brands fixed) ========= */
+/* ========= Brand colours (priority) ========= */
 const brandColours = {
-  "Milwaukee": "#d0021b", // red
+  "Milwaukee": "#d0021b",
   "DEWALT": "#ffd000", "DeWalt": "#ffd000", "Dewalt": "#ffd000",
-  "Makita": "#00a19b",  // teal
-  "Bosch": "#1f6feb"    // blue
+  "Makita": "#00a19b",
+  "Bosch": "#1f6feb"
 };
 const fallbackColours = ["#6aa6ff","#ff9fb3","#90e0c5","#ffd08a","#c9b6ff","#8fd3ff","#ffc6a8","#b2e1a1","#f5b3ff","#a4b0ff"];
-function brandColour(name, i=0){
-  if (!name) return fallbackColours[i % fallbackColours.length];
-  return brandColours[name] || fallbackColours[i % fallbackColours.length];
-}
+function brandColour(name, i=0){ return brandColours[name] || fallbackColours[i % fallbackColours.length]; }
 function canonicalBrand(name=""){
   const s = String(name).toLowerCase();
   if (s.includes("milwaukee")) return "Milwaukee";
@@ -35,13 +32,14 @@ let headers = [];
 let data = [];
 let headerMap = {};
 let monthColumns = []; // Aug..Jul
-let priceExVatIndex = -1;
 
 /* ========= Utils ========= */
 function toNumber(v){ if(v==null) return NaN; const n=parseFloat(String(v).replace(/[,£%]/g,"").trim()); return Number.isFinite(n)?n:NaN; }
 function fmtGBP(n){ return Number.isFinite(n)? new Intl.NumberFormat("en-GB",{style:"currency",currency:"GBP"}).format(n) : "–"; }
 function fmtDateUK(d){ try{ if(!d) return ""; const date = new Date(d); if (isNaN(date)) return String(d); return date.toLocaleDateString("en-GB"); }catch{ return String(d); } }
 const debounce=(fn,ms=200)=>{let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms);}};
+// Null-safe element setter
+function setText(id, value){ const el = document.getElementById(id); if (el) el.textContent = value; }
 
 /* ========= CSV parsing ========= */
 function parseCSVText(csvText){
@@ -70,7 +68,7 @@ function hydrate(arrayRows){
   headers = synthesiseHeader(headersRaw);
   const body = arrayRows.slice(headerRows).filter(r => r && r.some(c => String(c).trim() !== ""));
 
-  // Exact mapping (verified)
+  // Exact mapping
   const H = Object.fromEntries(headers.map((h,i)=>[h.trim(), i]));
   const idx = (name) => (H[name] ?? -1);
 
@@ -84,13 +82,10 @@ function hydrate(arrayRows){
     ebaySales:   idx("Ebay"),
     amazonSales: idx("Amazon Sales"),
     totalSales:  idx("Total"),
-    availableQty: idx("Available Stock No Van"),
-    availableVal: idx("Available Value No Van"),
     subCategory: idx("Sub Category"),
     lastInvoice: idx("Last Invoice Date"),
     salePriceExVat: idx("Sale Price Ex Vat")
   };
-  priceExVatIndex = headerMap.salePriceExVat;
 
   // Months strictly Aug..Jul
   const monthsList = ["Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar","Apr","May","Jun","Jul"];
@@ -174,14 +169,14 @@ function sortItems(items){
   }
 }
 
-/* ========= KPIs + Render ========= */
+/* ========= Sums & revenue ========= */
 function fmtInt(n){ return Number.isFinite(n)? n.toLocaleString("en-GB") : "–"; }
 function sum(arr){ return arr.reduce((s,v)=> s + (Number.isFinite(v)?v:0), 0); }
 
-function revenueTotals(items){
+function revenueSeries(items){
   const months = monthColumns.map(m=>m.name);
   const perMonth = months.map(m => sum(items.map(d => d.monthsRevenue[m])));
-  // truncate to last month with revenue data (>0 and finite)
+  // truncate to last non-zero month
   let last = -1;
   for (let i = perMonth.length - 1; i >= 0; i--) {
     if (Number.isFinite(perMonth[i]) && perMonth[i] > 0) { last = i; break; }
@@ -189,31 +184,30 @@ function revenueTotals(items){
   const end = last >= 0 ? last + 1 : 0;
   return {
     months: months.slice(0, end),
-    perMonth: perMonth.slice(0, end),
-    ytd: sum(perMonth.slice(0, end))
+    perMonth: perMonth.slice(0, end)
   };
 }
 
+/* ========= Render ========= */
 function refresh(){
   const items = currentFiltered();
   const itemsSorted = sortItems(items);
 
-  // KPIs
+  // KPIs (Revenue YTD removed)
   const totalSkus = items.length;
   const stockValue = sum(items.map(d=>d.stockValue));
   const avgProfit = items.length ? sum(items.map(d=>d.profitPct))/items.length : NaN;
   const combinedSales = sum(items.map(d=>d.combinedSales));
-  const rev = revenueTotals(items);
 
-  document.getElementById("kpiTotalSkus").textContent = fmtInt(totalSkus);
-  document.getElementById("kpiStockValue").textContent = fmtGBP(stockValue);
-  document.getElementById("kpiAvgProfit").textContent = Number.isFinite(avgProfit) ? `${avgProfit.toFixed(1)}%` : "–";
-  document.getElementById("kpiSalesCombined").textContent = fmtInt(combinedSales);
-  document.getElementById("kpiRevenueYTD").textContent = fmtGBP(rev.ytd);
+  setText("kpiTotalSkus", fmtInt(totalSkus));
+  setText("kpiStockValue", fmtGBP(stockValue));
+  setText("kpiAvgProfit", Number.isFinite(avgProfit) ? `${avgProfit.toFixed(1)}%` : "–");
+  setText("kpiSalesCombined", fmtInt(combinedSales));
 
-  // Charts (note: Profit per SKU removed per your request)
+  // Charts
+  const rev = revenueSeries(items);
   drawSalesRevenueTrend(items, rev);
-  drawBrandRevShareFab4(items);     // NEW donut
+  drawBrandRevShareFab4(items);
   drawBrandTotalsBar(items);
   drawBrandMonthlyStacked(items);
   drawBrandProfitBar(items);
@@ -224,7 +218,7 @@ function refresh(){
   renderInvoiceTable(items);
 }
 
-/* ========= Brand summary helpers ========= */
+/* ========= Brand summary ========= */
 function summariseByBrand(items){
   const by=new Map();
   for(const d of items){
@@ -236,8 +230,7 @@ function summariseByBrand(items){
         stockValue:0,
         profitSum:0, profitCount:0,
         revenue:0,
-        months:Object.fromEntries(monthColumns.map(c=>[c.name,0])),
-        monthsRevenue:Object.fromEntries(monthColumns.map(c=>[c.name,0]))
+        months:Object.fromEntries(monthColumns.map(c=>[c.name,0]))
       });
     }
     const b=by.get(key);
@@ -245,9 +238,8 @@ function summariseByBrand(items){
     b.stockValue    += Number.isFinite(d.stockValue)? d.stockValue : 0;
     if (Number.isFinite(d.profitPct)){ b.profitSum += d.profitPct; b.profitCount += 1; }
     for (const {name} of monthColumns){
-      const u=d.months[name], r=d.monthsRevenue[name];
-      b.months[name] += Number.isFinite(u)? u : 0;
-      b.monthsRevenue[name] += Number.isFinite(r)? r : 0;
+      const r=d.monthsRevenue[name];
+      b.months[name] += Number.isFinite(r)? r : 0; // store revenue for monthly stacks if needed
     }
     b.revenue += sum(Object.values(d.monthsRevenue));
   }
@@ -257,8 +249,7 @@ function summariseByBrand(items){
     stockValue:r.stockValue,
     avgProfitPct: r.profitCount? r.profitSum/r.profitCount : NaN,
     revenue:r.revenue,
-    months:r.months,
-    monthsRevenue:r.monthsRevenue
+    months:r.months
   }));
   rows.sort((a,b)=> b.revenue - a.revenue);
   return rows;
@@ -266,10 +257,10 @@ function summariseByBrand(items){
 
 /* ========= Charts ========= */
 
-// Sales & Revenue per Month (units bars + revenue line + truncated cum. line)
+// Sales & Revenue per Month (units bars + revenue line + truncated cumulative)
 function drawSalesRevenueTrend(items, rev){
   const months = rev.months;
-  const unitSums = months.map(m => sum(items.map(d => d.months[m])));
+  const unitSums = months.map(m => items.reduce((s,d)=> s + (Number.isFinite(d.months[m]) ? d.months[m] : 0), 0));
   const revenue = rev.perMonth;
   const cumulative = revenue.reduce((acc,v,i)=>{ acc.push((acc[i-1]||0)+(Number.isFinite(v)?v:0)); return acc; },[]);
 
@@ -285,24 +276,20 @@ function drawSalesRevenueTrend(items, rev){
     title:"Sales (Units) & Estimated Revenue per Month",
     xaxis:{tickangle:-45,automargin:true},
     yaxis:{title:"Units / £ ex VAT"},
-    height: document.getElementById("salesRevenueTrend").clientHeight
+    height: document.getElementById("salesRevenueTrend")?.clientHeight || 520
   },{responsive:true});
 }
 
-// NEW — Revenue share donut for Milwaukee, DeWalt, Makita, Bosch
+// Fab 4 revenue share
 function drawBrandRevShareFab4(items){
   const rows = summariseByBrand(items);
   const wanted = ["Milwaukee","DeWalt","Makita","Bosch"];
   const map = new Map(rows.map(r=>[r.brand, r]));
-  const labels = [];
-  const values = [];
-  const colors = [];
+  const labels = [], values = [], colors = [];
   wanted.forEach((w,i)=>{
     const r = map.get(w);
     const val = r ? r.revenue : 0;
-    labels.push(w);
-    values.push(val);
-    colors.push(brandColour(w,i));
+    labels.push(w); values.push(val); colors.push(brandColour(w,i));
   });
 
   Plotly.newPlot("brandRevShareFab4",[{
@@ -312,7 +299,7 @@ function drawBrandRevShareFab4(items){
   }],{
     ...baseLayout,
     title:"Revenue Share — Milwaukee / DeWalt / Makita / Bosch (ex VAT)",
-    height: document.getElementById("brandRevShareFab4").clientHeight
+    height: document.getElementById("brandRevShareFab4")?.clientHeight || 520
   },{responsive:true});
 }
 
@@ -330,7 +317,7 @@ function drawBrandTotalsBar(items){
     title:"Combined Sales by Brand (Internet + eBay)",
     xaxis:{automargin:true},
     yaxis:{title:"Combined Sales"},
-    height: document.getElementById("brandTotalsBar").clientHeight
+    height: document.getElementById("brandTotalsBar")?.clientHeight || 520
   },{responsive:true});
 }
 
@@ -342,7 +329,7 @@ function drawBrandMonthlyStacked(items){
     type:"bar",
     name:r.brand,
     x:months,
-    y:months.map(m=>r.months[m]),
+    y:months.map(m=> items.reduce((s,d)=> s + (canonicalBrand(d.brand)===r.brand ? (Number.isFinite(d.months[m])?d.months[m]:0) : 0), 0)),
     marker:{color: brandColour(r.brand,i)}
   }));
   Plotly.newPlot("brandMonthlyStacked", traces, {
@@ -351,7 +338,7 @@ function drawBrandMonthlyStacked(items){
     title:"Monthly Sales by Brand (Units, current year)",
     xaxis:{tickangle:-45,automargin:true},
     yaxis:{title:"Units"},
-    height: document.getElementById("brandMonthlyStacked").clientHeight
+    height: document.getElementById("brandMonthlyStacked")?.clientHeight || 520
   },{responsive:true});
 }
 
@@ -369,7 +356,7 @@ function drawBrandRevenueBar(items){
     title:"Estimated Revenue by Brand (ex VAT)",
     xaxis:{automargin:true},
     yaxis:{title:"£ ex VAT"},
-    height: document.getElementById("brandRevenueBar").clientHeight
+    height: document.getElementById("brandRevenueBar")?.clientHeight || 520
   },{responsive:true});
 }
 
@@ -395,16 +382,16 @@ function drawSkuRevenueTop(items){
     title:"Top 100 SKUs by Estimated Revenue (ex VAT)",
     xaxis:{automargin:true, showticklabels:false},
     yaxis:{title:"£ ex VAT"},
-    height: document.getElementById("skuRevenueTop").clientHeight
+    height: document.getElementById("skuRevenueTop")?.clientHeight || 520
   },{responsive:true});
 }
 
-/* ========= Last Invoice table ========= */
+/* ========= Table ========= */
 function renderInvoiceTable(items){
   const tbody = document.querySelector("#invoiceTable tbody");
+  if (!tbody) return;
   tbody.innerHTML = "";
-  const rows = items.slice(0,200);
-  for(const d of rows){
+  items.slice(0,200).forEach(d=>{
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${d.stockCode}</td>
@@ -414,7 +401,7 @@ function renderInvoiceTable(items){
       <td>${fmtDateUK(d.lastInvoice)}</td>
     `;
     tbody.appendChild(tr);
-  }
+  });
 }
 
 /* ========= Events ========= */
