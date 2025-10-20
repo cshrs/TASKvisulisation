@@ -4,17 +4,19 @@ const BUILT_IN_CSV = "SEPTCLER 1.csv"; // set "" to disable auto-load
 /* ========= Brand normalisation & colours ========= */
 const normKey = s => String(s||"").toLowerCase().replace(/[^a-z0-9]+/g,"");
 
-// Extend/adjust this list as you see more variants in your exports
+// Extend this list as you see more variants in your exports
 const BRAND_ALIASES = {
-  // Priority brands
+  // Priority brands (canonical → label)
   "milwaukee":"Milwaukee",
   "dewalt":"DeWalt","de-walt":"DeWalt",
   "makita":"Makita",
   "bosch":"Bosch","boschprofessional":"Bosch","boschaccessories":"Bosch",
   "hikoki":"HiKOKI","hi-koki":"HiKOKI","hikokipt":"HiKOKI",
   "hitachi":"HiKOKI","hitachipowertools":"HiKOKI",
-  "everbuild":"Everbuild", // NEW: merge Everbuild variants
-  // Others
+  "everbuild":"Everbuild",
+  "ndurance":"N-Durance", // NEW: merges “N-Durance”, “N-DURANCE”, etc.
+
+  // Others (add as needed)
   "einhell":"Einhell"
 };
 
@@ -30,7 +32,8 @@ const brandColours = {
   "Bosch": "#1f6feb",
   "HiKOKI": "#0b8457",
   "Einhell": "#cc0033",
-  "Everbuild": "#ff8c00" // orange
+  "Everbuild": "#ff8c00",
+  "N-Durance": "#7d5cff" // pastel purple
 };
 const fallbackColours = ["#6aa6ff","#ff9fb3","#90e0c5","#ffd08a","#c9b6ff","#8fd3ff","#ffc6a8","#b2e1a1","#f5b3ff","#a4b0ff"];
 function brandColour(name, i=0){ return brandColours[name] || fallbackColours[i % fallbackColours.length]; }
@@ -182,7 +185,7 @@ function populateFilters(){
   uniqueSorted(data.map(d=>d.subCategory)).forEach(v=> subSel.add(new Option(v, v)));
 }
 
-/* ========= Sorting (kept for list-based charts) ========= */
+/* ========= Sorting (for table/top SKUs) ========= */
 function sortItems(items){
   const how = document.getElementById("sortBy").value;
   const arr=[...items];
@@ -274,7 +277,7 @@ function refresh(){
   drawBrandRevenueBar(itemsAgg);
   drawSkuRevenueTop(itemsAgg);
 
-  // SKU focus area
+  // SKU focus area (appears on 1–5 matches)
   const q = document.getElementById("search").value.trim();
   const matches = itemsSearch;
   const focus = q && matches.length > 0 && matches.length <= 5;
