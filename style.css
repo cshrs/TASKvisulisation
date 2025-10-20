@@ -74,6 +74,19 @@ main{padding:24px; overflow-y:auto; scroll-behavior:smooth}
   flex:1 1 auto; width:100% !important; height:100% !important; overflow:visible !important;
 }
 
+/* Detail card (single SKU) */
+.detail-card{
+  background:var(--card); border:1px solid var(--border); border-radius:18px;
+  padding:16px; margin-bottom:28px; box-shadow:0 10px 24px rgba(0,0,0,.05);
+}
+.detail-card h2{margin:0 0 12px}
+.detail-grid{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:12px;
+}
+.detail-grid .dl{display:block; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em}
+.detail-grid .dv{display:block; font-size:16px; font-weight:600}
+
 /* Table card */
 .table-card{
   background:var(--card); border:1px solid var(--border); border-radius:18px;
