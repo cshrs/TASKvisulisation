@@ -4,9 +4,8 @@ const BUILT_IN_CSV = "SEPTCLER 1.csv"; // set "" to disable auto-load
 /* ========= Brand normalisation & colours ========= */
 const normKey = s => String(s||"").toLowerCase().replace(/[^a-z0-9]+/g,"");
 
-// Extend this list as you see more variants in your exports
+// Extend this list as you see more variants in your exports (canonical → label)
 const BRAND_ALIASES = {
-  // Priority brands
   "milwaukee":"Milwaukee",
   "dewalt":"DeWalt","de-walt":"DeWalt",
   "makita":"Makita",
@@ -15,8 +14,6 @@ const BRAND_ALIASES = {
   "hitachi":"HiKOKI","hitachipowertools":"HiKOKI",
   "everbuild":"Everbuild",
   "ndurance":"N-Durance",
-
-  // Others (add as needed)
   "einhell":"Einhell"
 };
 
@@ -101,7 +98,6 @@ function hydrate(arrayRows){
   const H = Object.fromEntries(headers.map((h,i)=>[h.trim(), i]));
   const idx = (name) => (H[name] ?? -1);
 
-  // known / fuzzy header map
   headerMap = {
     stockCode:     idx("Stock Code"),
     description:   idx("Description ..............."),
@@ -114,8 +110,8 @@ function hydrate(arrayRows){
     totalSales:    idx("Total"),
     subCategory:   idx("Sub Category"),
     lastInvoice:   idx("Last Invoice Date"),
-    salePriceExVat: idx("Sale Price Ex Vat") !== -1 ? idx("Sale Price Ex Vat") : findHeaderIndex(["sale","price","ex","vat"]),
-    onlinePriceExVat: findHeaderIndex(["online","price","ex","vat"]) // fuzzy
+    salePriceExVat:  idx("Sale Price Ex Vat") !== -1 ? idx("Sale Price Ex Vat") : findHeaderIndex(["sale","price","ex","vat"]),
+    onlinePriceExVat: findHeaderIndex(["online","price","ex","vat"])
   };
 
   // Current-year months strictly: Aug..Jul
@@ -166,22 +162,21 @@ function hydrate(arrayRows){
 /* ========= Filtering ========= */
 function uniqueSorted(arr){ return [...new Set(arr.filter(Boolean))].sort((a,b)=>a.localeCompare(b)); }
 
+// Global items for dashboards (ignore free-text search)
 function baseItemsForAggregates(){
   const br  = document.getElementById("brandFilter").value;
-  const sub = document.getElementById("subcatFilter").value;
   return data.filter(d=>{
     if (br  && d.brand !== br) return false;
-    if (sub && d.subCategory !== sub) return false;
     return true;
   });
 }
+
+// Items that apply the search (used for SKU focus + invoice table)
 function itemsWithSearch(){
   const q   = document.getElementById("search").value.trim().toLowerCase();
   const br  = document.getElementById("brandFilter").value;
-  const sub = document.getElementById("subcatFilter").value;
   return data.filter(d=>{
     if (br  && d.brand !== br) return false;
-    if (sub && d.subCategory !== sub) return false;
     if (q){
       const hay=(d.description+" "+d.stockCode).toLowerCase();
       if (!hay.includes(q)) return false;
@@ -189,12 +184,11 @@ function itemsWithSearch(){
     return true;
   });
 }
+
 function populateFilters(){
   const brandSel = document.getElementById("brandFilter");
-  const subSel   = document.getElementById("subcatFilter");
-  brandSel.length = 1; subSel.length = 1;
+  brandSel.length = 1;
   uniqueSorted(data.map(d=>d.brand)).forEach(v=> brandSel.add(new Option(v, v)));
-  uniqueSorted(data.map(d=>d.subCategory)).forEach(v=> subSel.add(new Option(v, v)));
 }
 
 /* ========= Sorting ========= */
@@ -276,13 +270,17 @@ function refresh(){
   const avgProfit = itemsAgg.length ? sum(itemsAgg.map(d=>d.profitPct))/itemsAgg.length : NaN;
   const combinedSales = sum(itemsAgg.map(d=>d.combinedSales));
 
+  // Estimated YTD revenue (sum of monthsRevenue up to the last active month across the dataset)
+  const revAgg = revenueSeries(itemsAgg);
+  const ytdRevenue = sum(revAgg.perMonth);
+
   setText("kpiTotalSkus", Number.isFinite(totalSkus) ? totalSkus.toLocaleString("en-GB") : "–");
   setText("kpiStockValue", fmtGBP(stockValue));
+  setText("kpiYtdRevenue", fmtGBP(ytdRevenue));
   setText("kpiAvgProfit", Number.isFinite(avgProfit) ? `${avgProfit.toFixed(1)}%` : "–");
   setText("kpiSalesCombined", Number.isFinite(combinedSales) ? combinedSales.toLocaleString("en-GB") : "–");
 
   // Global charts
-  const revAgg = revenueSeries(itemsAgg);
   drawSalesRevenueTrend(itemsAgg, revAgg);
   drawBrandRevShareFab4(itemsAgg);
   drawBrandTotalsBar(itemsAgg);
@@ -332,7 +330,7 @@ function safeClear(id){
 
 /* ========= Charts ========= */
 
-// Global — Sales & Revenue per Month (units + revenue + truncated cumulative)
+// Sales & Revenue per Month (units + revenue + truncated cumulative)
 function drawSalesRevenueTrend(items, rev){
   const months = rev.months;
   const unitSums = months.map(m => items.reduce((s,d)=> s + (Number.isFinite(d.months[m]) ? d.months[m] : 0), 0));
@@ -355,7 +353,7 @@ function drawSalesRevenueTrend(items, rev){
   },{responsive:true});
 }
 
-// Global — Fab 4 revenue share
+// Fab 4 revenue share
 function drawBrandRevShareFab4(items){
   const rows = summariseByBrand(items);
   const wanted = ["Milwaukee","DeWalt","Makita","Bosch"];
@@ -378,7 +376,7 @@ function drawBrandRevShareFab4(items){
   },{responsive:true});
 }
 
-// Global — Combined Sales by Brand
+// Combined Sales by Brand
 function drawBrandTotalsBar(items){
   const rows = summariseByBrand(items).slice(0,15);
   Plotly.newPlot("brandTotalsBar",[{
@@ -396,7 +394,7 @@ function drawBrandTotalsBar(items){
   },{responsive:true});
 }
 
-// Global — Monthly Units by Brand (stacked)
+// Monthly Units by Brand (stacked)
 function drawBrandMonthlyStacked(items){
   const rows = summariseByBrand(items).slice(0,10);
   const months = monthColumns.map(c=>c.name);
@@ -417,7 +415,7 @@ function drawBrandMonthlyStacked(items){
   },{responsive:true});
 }
 
-// Global — Brand revenue bar (ex VAT, monthly-units × price-basis)
+// Brand revenue bar (ex VAT)
 function drawBrandRevenueBar(items){
   const rows = summariseByBrand(items).slice(0,15);
   Plotly.newPlot("brandRevenueBar",[{
@@ -435,7 +433,7 @@ function drawBrandRevenueBar(items){
   },{responsive:true});
 }
 
-// NEW — Top 10 Brands: Order Share (Internet + eBay units)
+// Top 10 Brands — Order Share (Internet + eBay units)
 function drawBrandTop10OrderShare(items){
   const rows = summariseByBrand(items)
     .filter(r => Number.isFinite(r.combinedSales) && r.combinedSales > 0)
@@ -455,7 +453,7 @@ function drawBrandTop10OrderShare(items){
   },{responsive:true});
 }
 
-// NEW — Top 10 Brands: Revenue Share (ex VAT)
+// Top 10 Brands — Revenue Share (ex VAT)
 function drawBrandTop10RevenueShare(items){
   const rows = summariseByBrand(items)
     .filter(r => Number.isFinite(r.revenue) && r.revenue > 0)
@@ -475,7 +473,7 @@ function drawBrandTop10RevenueShare(items){
   },{responsive:true});
 }
 
-// Global — Top revenue SKUs (ex VAT)
+// Top revenue SKUs (ex VAT)
 function drawSkuRevenueTop(items){
   const months = monthColumns.map(m=>m.name);
   const withRevenue = items.map(d=>({
@@ -509,7 +507,7 @@ function truncatedMonthsForSku(d){
     const u = d.months[months[i]];
     const r = d.monthsRevenue[months[i]];
     if ((Number.isFinite(u) && u > 0) || (Number.isFinite(r) && r > 0)) { last = i; break; }
-  }
+    }
   const end = last >= 0 ? last + 1 : 0;
   return months.slice(0, end);
 }
@@ -578,6 +576,6 @@ document.getElementById("loadSample").addEventListener("click", ()=>{
   if(!BUILT_IN_CSV){ alert("Set BUILT_IN_CSV in app.js or use the file picker."); return; }
   loadFromPath(BUILT_IN_CSV);
 });
-["search","brandFilter","subcatFilter","sortBy"].forEach(id=>{
+["search","brandFilter","sortBy"].forEach(id=>{
   document.getElementById(id).addEventListener("input", debounce(refresh,150));
 });

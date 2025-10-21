@@ -25,8 +25,8 @@
       </button>
 
       <input id="search" type="search" placeholder="Search by SKU or description…" />
-      <select id="brandFilter"><option value="">Brand (All)</option></select>
-      <select id="subcatFilter"><option value="">Sub Category (All)</option></select>
+      <!-- Brand filter comes from “Manu/ Brand” column (normalised) -->
+      <select id="brandFilter"><option value="">Brand (Manu/Brand — All)</option></select>
 
       <select id="sortBy">
         <option value="profitDesc">Sort: Profit % (high→low)</option>
@@ -44,11 +44,12 @@
     <div id="kpis" class="kpis">
       <div class="kpi"><div class="kpi-value" id="kpiTotalSkus">–</div><div class="kpi-label">SKUs</div></div>
       <div class="kpi"><div class="kpi-value" id="kpiStockValue">–</div><div class="kpi-label">STOCK VALUE</div></div>
+      <div class="kpi"><div class="kpi-value" id="kpiYtdRevenue">–</div><div class="kpi-label">EST. YTD REVENUE (ex VAT)</div></div>
       <div class="kpi"><div class="kpi-value" id="kpiAvgProfit">–</div><div class="kpi-label">AVG % PROFIT</div></div>
       <div class="kpi"><div class="kpi-value" id="kpiSalesCombined">–</div><div class="kpi-label">COMBINED SALES (Internet + eBay)</div></div>
     </div>
 
-    <!-- Global charts (ignore free-text search; honour Brand/Subcat dropdowns) -->
+    <!-- Global charts (ignore free-text search; honour Brand dropdown) -->
     <div class="chart" id="salesRevenueTrend"></div>
     <div class="chart" id="brandRevShareFab4"></div>
     <div class="chart" id="brandTotalsBar"></div>
