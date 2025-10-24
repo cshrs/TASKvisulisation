@@ -12,7 +12,6 @@ const NOT_BRAND_KEYS = new Set([
 ]);
 
 // Canonical brand map (key = normKey(raw) → value = Canonical Brand)
-// (Built from your provided list and earlier merges.)
 const BRAND_ALIASES = {
   "3inone":"3-IN-ONE","3m":"3M","xms":"XMS",
   "abracs":"Abracs","abru":"Abru","abus":"ABUS","abusmechanical":"ABUS","acer":"Acer","advent":"Advent",
@@ -198,16 +197,6 @@ function activeMonths(){
   }
   return last >= 0 ? months.slice(0,last+1) : [];
 }
-function periodLabel(){
-  const mode = getPeriodMode();
-  if (mode === "Month") return getSelectedMonth() ? `Period: ${getSelectedMonth()}` : "Period: Month";
-  const am = activeMonths();
-  return am.length ? `Period: YTD to ${am[am.length-1]}` : "Period: YTD";
-}
-function brandLabel(){
-  const v = document.getElementById("brandFilter").value;
-  return `Brand: ${v || "All"}`;
-}
 
 /* ========= Hydrate from raw SEPTCLER ========= */
 function hydrate(arrayRows){
@@ -362,9 +351,7 @@ function summariseByBrand(items, monthsActive){
         units:0,
         stockValue:0,
         profitSum:0, profitCount:0,
-        revenue:0,
-        months: Object.fromEntries(monthColumns.map(c=>[c.name,0])),
-        monthsUnits: Object.fromEntries(monthColumns.map(c=>[c.name,0]))
+        revenue:0
       });
     }
     const b=by.get(key);
@@ -398,13 +385,12 @@ function refresh(){
 
   const totalRevenue = sum(rSeries.perMonth);
   setText("kpiYtdRevenue", fmtGBP(totalRevenue));
-  document.getElementById("kpiRevenueLabel").textContent =
-    getPeriodMode()==="Month" ? `EST. REVENUE (${periodLabel().replace("Period: ","")})` : `EST. REVENUE (ex VAT, ${periodLabel().replace("Period: ","")})`;
+  document.getElementById("kpiRevenueLabel").textContent = "EST. REVENUE (ex VAT)";
 
   const combinedSales = sum(itemsAgg.map(d=>d.combinedSales)); // as exported (lifetime)
   setText("kpiSalesCombined", Number.isFinite(combinedSales) ? combinedSales.toLocaleString("en-GB") : "–");
 
-  // Global charts (period-aware)
+  // Global charts (period-aware; titles without extra context)
   drawUnitsTrend(uSeries);
   drawRevenueTrend(rSeries);
   drawBrandRevShareFab4(itemsAgg, rSeries);
@@ -441,7 +427,7 @@ function refresh(){
     if (detail) detail.hidden = true;
   }
 
-  // Invoice table reflects the current search — NO LIMIT
+  // Invoice table reflects the current search — limit 400 unless brand is filtered
   renderInvoiceTable(matches);
 }
 
@@ -452,11 +438,8 @@ function safeClear(id){
   try { Plotly.purge(id); } catch {}
   el.innerHTML = "";
 }
-function titleWithContext(base){
-  return `${base} — ${periodLabel()} • ${brandLabel()}`;
-}
 
-/* ========= Charts ========= */
+/* ========= Charts (titles reverted to simple labels) ========= */
 
 // Units per Month
 function drawUnitsTrend(uSeries){
@@ -472,7 +455,7 @@ function drawUnitsTrend(uSeries){
     hovertemplate: "%{x}: %{y:.0f} units<extra></extra>"
   }], {
     ...baseLayout,
-    title: titleWithContext("Units per Month"),
+    title: "Units per Month",
     xaxis: { tickangle: -45, automargin: true },
     yaxis: { title: "Units" },
     height: document.getElementById("salesUnitsTrend")?.clientHeight || 520
@@ -506,14 +489,14 @@ function drawRevenueTrend(rSeries){
     }
   ], {
     ...baseLayout,
-    title: titleWithContext("Estimated Revenue per Month (ex VAT)"),
+    title: "Estimated Revenue per Month (ex VAT)",
     xaxis: { tickangle: -45, automargin: true },
     yaxis: { title: "£ ex VAT" },
     height: document.getElementById("revenueTrend")?.clientHeight || 520
   }, { responsive: true });
 }
 
-// Fab 4 revenue share (period-aware)
+// Fab 4 revenue share
 function drawBrandRevShareFab4(items, rSeries){
   const monthsActive = rSeries.months;
   const rows = summariseByBrand(items, monthsActive);
@@ -532,7 +515,7 @@ function drawBrandRevShareFab4(items, rSeries){
     marker:{colors:colors}
   }],{
     ...baseLayout,
-    title: titleWithContext("Revenue Share — Milwaukee / DeWalt / Makita / Bosch (ex VAT)"),
+    title: "Revenue Share — Milwaukee / DeWalt / Makita / Bosch (ex VAT)",
     height: document.getElementById("brandRevShareFab4")?.clientHeight || 520
   },{responsive:true});
 }
@@ -548,11 +531,10 @@ function drawBrandTotalsBar(items, uSeries){
     x: rows.map(r=>r.brand),
     y: rows.map(r=>r.units),
     marker:{color: rows.map((r,i)=>brandColour(r.brand,i))},
-    hovertemplate:"<b>%{x}</b><br>Units (%{text})<extra></extra>",
-    text: Array(rows.length).fill(periodLabel().replace("Period: ",""))
+    hovertemplate:"<b>%{x}</b><br>Units<extra></extra>"
   }],{
     ...baseLayout,
-    title: titleWithContext("Units by Brand (Top 15)"),
+    title: "Units by Brand (Top 15)",
     xaxis:{automargin:true},
     yaxis:{title:"Units"},
     height: document.getElementById("brandTotalsBar")?.clientHeight || 520
@@ -573,7 +555,7 @@ function drawBrandMonthlyStacked(items){
   Plotly.newPlot("brandMonthlyStacked", traces, {
     ...baseLayout,
     barmode:"stack",
-    title: titleWithContext("Monthly Units by Brand (current year)"),
+    title: "Monthly Units by Brand (current year)",
     xaxis:{tickangle:-45,automargin:true},
     yaxis:{title:"Units"},
     height: document.getElementById("brandMonthlyStacked")?.clientHeight || 520
@@ -591,14 +573,14 @@ function drawBrandRevenueBar(items, rSeries){
     hovertemplate:"<b>%{x}</b><br>Est. Revenue: £%{y:,.0f}<extra></extra>"
   }],{
     ...baseLayout,
-    title: titleWithContext("Estimated Revenue by Brand (Top 15, ex VAT)"),
+    title: "Estimated Revenue by Brand (Top 15, ex VAT)",
     xaxis:{automargin:true},
     yaxis:{title:"£ ex VAT"},
     height: document.getElementById("brandRevenueBar")?.clientHeight || 520
   },{responsive:true});
 }
 
-// Top 10 Brands — Order Share (UNITS, period-aware)
+// Top 10 Brands — Order Share (UNITS)
 function drawBrandTop10OrderShare(items, uSeries){
   const rows = summariseByBrand(items, uSeries.months)
     .filter(r => Number.isFinite(r.units) && r.units > 0)
@@ -614,11 +596,11 @@ function drawBrandTop10OrderShare(items, uSeries){
     marker:{colors: rows.map((r,i)=>brandColour(r.brand,i))}
   }],{
     ...baseLayout,
-    title: titleWithContext("Top 10 Brands — Order Share (Units)")
+    title: "Top 10 Brands — Order Share (Units)"
   },{responsive:true});
 }
 
-// Top 10 Brands — Revenue Share (ex VAT, period-aware)
+// Top 10 Brands — Revenue Share (ex VAT)
 function drawBrandTop10RevenueShare(items, rSeries){
   const rows = summariseByBrand(items, rSeries.months)
     .filter(r => Number.isFinite(r.revenue) && r.revenue > 0)
@@ -634,7 +616,7 @@ function drawBrandTop10RevenueShare(items, rSeries){
     marker:{colors: rows.map((r,i)=>brandColour(r.brand,i))}
   }],{
     ...baseLayout,
-    title: titleWithContext("Top 10 Brands — Revenue Share (ex VAT)")
+    title: "Top 10 Brands — Revenue Share (ex VAT)"
   },{responsive:true});
 }
 
@@ -642,11 +624,7 @@ function drawBrandTop10RevenueShare(items, rSeries){
 function drawSkuRevenueTop(items, monthsActive){
   const withRevenue = items.map(d=>{
     const rev = sum(monthsActive.map(m=>d.monthsRevenue[m]));
-    return {
-      sku: `${d.stockCode} — ${d.description}`,
-      brand: d.brand,
-      revenue: rev
-    };
+    return { sku: `${d.stockCode} — ${d.description}`, brand: d.brand, revenue: rev };
   }).filter(x=>Number.isFinite(x.revenue) && x.revenue>0);
 
   const top = withRevenue.sort((a,b)=>b.revenue-a.revenue).slice(0,100);
@@ -658,7 +636,7 @@ function drawSkuRevenueTop(items, monthsActive){
     hovertemplate:"<b>%{x}</b><br>Est. Revenue: £%{y:,.0f}<extra></extra>"
   }],{
     ...baseLayout,
-    title: titleWithContext("Top 100 SKUs by Estimated Revenue (ex VAT)"),
+    title: "Top 100 SKUs by Estimated Revenue (ex VAT)",
     xaxis:{automargin:true, showticklabels:false},
     yaxis:{title:"£ ex VAT"},
     height: document.getElementById("skuRevenueTop")?.clientHeight || 520
@@ -707,7 +685,7 @@ function drawSkuFocusTrend(skus){
 
   Plotly.newPlot("skuFocusTrend", [...unitTraces, ...revTraces], {
     ...baseLayout,
-    title: titleWithContext(skus.length===1 ? `SKU Monthly Units & Revenue — ${skus[0].stockCode}` : "Selected SKUs — Monthly Units & Revenue"),
+    title: skus.length===1 ? `SKU Monthly Units & Revenue — ${skus[0].stockCode}` : "Selected SKUs — Monthly Units & Revenue",
     xaxis:{tickangle:-45, automargin:true},
     yaxis:{title:"Units"},
     yaxis2:{title:"£ ex VAT", overlaying:"y", side:"right"},
@@ -716,13 +694,17 @@ function drawSkuFocusTrend(skus){
   }, {responsive:true});
 }
 
-/* ========= Invoice table ========= */
+/* ========= Invoice table (limit = 400 unless Brand filtered) ========= */
 function renderInvoiceTable(items){
   const tbody = document.querySelector("#invoiceTable tbody");
   if (!tbody) return;
   tbody.innerHTML = "";
-  // NO LIMIT — show all matches
-  items.forEach(d=>{
+
+  const brandValue = document.getElementById("brandFilter").value;
+  const limited = !brandValue; // limit when brand is NOT filtered
+  const rows = limited ? items.slice(0, 400) : items;
+
+  rows.forEach(d=>{
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${d.stockCode}</td>
@@ -733,6 +715,16 @@ function renderInvoiceTable(items){
     `;
     tbody.appendChild(tr);
   });
+
+  // Update the note below the table to reflect the limit/no-limit state
+  const noteEl = document.querySelector(".table-card .note");
+  if (noteEl){
+    if (limited){
+      noteEl.textContent = "Showing the first 400 SKUs that match your current search/filters. Select a Brand to see all matches.";
+    } else {
+      noteEl.textContent = "Showing all SKUs that match your current search/filters.";
+    }
+  }
 }
 
 /* ========= Events ========= */
