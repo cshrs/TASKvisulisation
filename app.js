@@ -4,33 +4,150 @@ const BUILT_IN_CSV = "SEPTCLER 1.csv"; // set "" to disable auto-load
 /* ========= Brand normalisation & colours ========= */
 const normKey = s => String(s||"").toLowerCase().replace(/[^a-z0-9]+/g,"");
 
-// Extend this list as you see more variants in your exports (canonical → label)
+// Treat these tokens as non-brands ("Other")
+const NOT_BRAND_KEYS = new Set([
+  "0","305","356","407","40","ew","g","gh","ing","ion","jo","o","p","s","son","tsadhesives",
+  "utomotive","Â","Ã","commandtm","crescentr","irwinjack","irwinrecord","irwinviseg","irwinhilmor",
+  "lth","mc","numaticmc"
+]);
+
+// Canonical brand map (key = normKey(raw) → value = Canonical Brand)
+// Built from your full list.
 const BRAND_ALIASES = {
-  "milwaukee":"Milwaukee",
-  "dewalt":"DeWalt","de-walt":"DeWalt",
-  "makita":"Makita",
-  "bosch":"Bosch","boschprofessional":"Bosch","boschaccessories":"Bosch",
-  "hikoki":"HiKOKI","hi-koki":"HiKOKI","hikokipt":"HiKOKI",
-  "hitachi":"HiKOKI","hitachipowertools":"HiKOKI",
-  "everbuild":"Everbuild",
-  "ndurance":"N-Durance",
-  "einhell":"Einhell"
+  "3inone":"3-IN-ONE","3m":"3M","xms":"XMS",
+
+  "abracs":"Abracs","abru":"Abru","abus":"ABUS","abusmechanical":"ABUS","acer":"Acer","advent":"Advent",
+  "aerosol":"Aerosol","airmaster":"Airmaster","alm":"ALM","almmanufacturi":"ALM","amazon":"Amazon",
+  "amblers":"Amblers","amblerssafety":"Amblers Safety","americanline":"American Line","antex":"Antex",
+  "apache":"Apache","apex":"Apex","apple":"Apple","araldite":"Araldite","arctichayes":"Arctic Hayes",
+  "armogard":"Armorgard","arrow":"Arrow",
+
+  "bahco":"Bahco","bailey":"Bailey","bakers":"Bakers","baridi":"Baridi","barron":"BARRON","batavia":"Batavia",
+  "beagriease":"BE AGRIEase","beacon":"Beacon","beal":"Beal","beats":"Beats","beeswift":"Beeswift",
+  "belle":"Belle","bessey":"Bessey","beta":"Beta","bigwipes":"Big Wipes","blackdecker":"Black & Decker",
+  "blackedge":"Blackedge","blackfriar":"Blackfriar","bluecol":"BLUECOL","bluespot":"BlueSpot Tools","boa":"BOA",
+  "bolle":"Bollé","bollesafety":"Bollé","bondit":"Bond It","bondloc":"Bondloc",
+  "bosch":"Bosch","boschacc":"Bosch","bosh":"Bosch","bostik":"Bostik","bostitch":"Bostitch",
+  "bpcfixings":"BPC Fixings","brand":"Other","brennenstuhl":"Brennenstuhl","britoolexpert":"Britool Expert",
+  "britool":"Britool Expert","briwax":"Briwax","brk":"BRK","broadfix":"Broadfix","buckbootz":"BuckBootz",
+  "buckler":"Buckler Boots","bucklerboots":"Buckler Boots","bulldog":"Bulldog","byron":"Byron",
+
+  "cablequick":"CableQuick","campingaz":"Campingaz","carplan":"CarPlan","carriage":"Carriage","carver":"Carver",
+  "cascamite":"Cascamite","castle":"Castle","castleclothing":"Castle Clothing","caterpillar":"Caterpillar",
+  "champion":"Champion","channellock":"Channellock","class":"Class","coleman":"Coleman","collection":"Collection",
+  "command":"Command","concept":"Concept","copydex":"Copydex","coreplus":"Coreplus","cox":"COX","crescent":"Crescent",
+  "crescentnichol":"Crescent Nicholson","crescentwiss":"Crescent Wiss","ct1":"CT1","ctie":"CT1","cuprinol":"Cuprinol",
+  "curver":"Curver",
+
+  "dart":"DART","decosol":"Decosol","defender":"Defender","dellonda":"Dellonda","denso":"Denso","denver":"Denver",
+  "detavimark":"Deta Vimark","dewalt":"DeWalt","dewaltdrywall":"DeWalt","dewaltrespirat":"DeWalt",
+  "dewaltacc":"DeWalt","dewaltmc":"DeWalt","dickies":"Dickies","dimplex":"Dimplex","disston":"Disston","dmt":"DMT",
+  "doff":"DOFF","dormer":"Dormer","dowsil":"Dowsil","draper":"Draper","dunlop":"Dunlop","duotool":"DUOTOOL",
+  "duracell":"Duracell","duratool":"Duratool",
+
+  "emagnets":"E-Magnets","earlex":"Earlex","ecoflow":"EcoFlow","edgepoint":"EdgePoint","edma":"Edma",
+  "einhell":"Einhell","elora":"Elora","energizer":"Energizer","estwing":"Estwing","everbuild":"Everbuild",
+  "eveready":"Eveready","evostik":"Evo-Stik","evolution":"Evolution","evolutionpower":"Evolution","excel":"Excel",
+  "expert":"Expert",
+
+  "fmprducts":"F M Products","facom":"Facom","faithfull":"Faithfull","faithfullpower":"Faithfull Power","fein":"FEIN",
+  "festool":"Festool","fireangel":"FireAngel","firmahold":"firmaHold","firstalert":"First Alert","fischer":"Fischer",
+  "fisco":"Fisco","fisher":"Fisher","fiskars":"Fiskars","flexpower":"Flex Power Tools","flexpowertool":"Flex Power Tools",
+  "flexipads":"Flexipads","flexipadsworld":"Flexipads","flexovit":"Flexovit","flopro":"Flopro","flowtech":"Flowtech",
+  "fluxite":"Fluxite","footprint":"Footprint","forefix":"Forefix","forge":"Forge","forgefix":"ForgeFix","fort":"Fort",
+  "freud":"Freud","frysmetals":"Frys Metals",
+
+  "gardman":"Gardman","garryson":"Garryson","gedore":"Gedore","gerber":"Gerber","gopro":"GoPro","gorilla":"Gorilla",
+  "gorillaglue":"Gorilla Glue","grabo":"Grabo","grampianpackag":"Grampian Packaging","gripit":"Gripit","gys":"GYS",
+  "gys001":"GYS",
+
+  "halls":"Halls","hammerite":"Hammerite","hanson":"Hanson","hardyakka":"Hard Yakka","harris":"Harris",
+  "harrisonclou":"Harrison & Clough","hellyhansen":"Helly Hansen","henrysquire":"Henry Squire","hikoki":"HiKOKI",
+  "hitachi":"HiKOKI","hills":"Hills","hmt":"HMT","holemakertechn":"HMT","holzmann":"Holzmann","hotspot":"Hotspot",
+  "hozelock":"Hozelock","hultafors":"Hultafors","husqvarna":"Husqvarna","hyundai":"Hyundai",
+
+  "illbruck":"illbruck","imex":"Imex","india":"India","irwin":"Irwin","itlinsulated":"ITL Insulated",
+
+  "jcb":"JCB","jcpfixings":"JCP Fixings","jeaton":"Jeaton","jefferson":"Jefferson","jeyes":"Jeyes","jokari":"Jokari",
+  "jsp":"JSP","jubilee":"Jubilee","just1source":"Just 1 Source","justonesource":"Just 1 Source",
+
+  "kane":"KANE","karcher":"Karcher","kent":"Kent","kandestowe":"Kent & Stowe","kentstowe":"Kent & Stowe","keter":"Keter",
+  "kew":"Kärcher (Nilfisk Alt.)","kewnilfiskalt":"Kew Nilfisk Alto","kidde":"Kidde","kielder":"Kielder","kilrock":"Kilrock",
+  "knipex":"Knipex","kodak":"Kodak","komelon":"Komelon","kunys":"Kuny's","kwb":"KWB",
+
+  "laserliner":"Laserliner","ledlenser":"Ledlenser","leica":"Leica","leicageosystem":"Leica Geosystems","lenovo":"Lenovo",
+  "lenox":"Lenox","lessmann":"Lessmann","lg":"LG","liberon":"Liberon","lighthouse":"Lighthouse","lindab":"Lindab",
+  "lindstrom":"Lindstrom","link2home":"Link2Home","littlegiant":"Little Giant","llitools":"Lli Tools","loctite":"Loctite",
+  "logik":"Logik","loncin":"Loncin","lufkin":"Lufkin","lumag":"Lumag","lumatic":"Lumatic","lyte":"Lyte",
+
+  "maglite":"Maglite","makita":"Makita","makitaacc":"Makita","makitamc":"Makita","mapei":"Mapei","marcrist":"Marcrist",
+  "marigold":"Marigold","markal":"Markal","marshalltown":"Marshalltown","martinpricefa":"Martin Price Fasteners",
+  "marxman":"Marxman","master":"Master","masterlock":"Master Lock","masterplug":"Masterplug","matabi":"Matabi","maun":"Maun",
+  "medikit":"Medikit","melco":"Melco","meridianlighti":"Meridian Lighting","metabo":"Metabo","metalmate":"Metalmate",
+  "microsoft":"Microsoft","milwaukee":"Milwaukee","miscellaneous":"Other","moldex":"Moldex","monument":"Monument",
+  "moorewright":"Moore & Wright","multisharp":"Multi-Sharp","multicore":"Multicore",
+
+  "ndurance":"N-Durance","nailfixings":"Nails & Fixings","nailsfixings":"Nails & Fixings","nilfisk":"Nilfisk",
+  "nilfiskalto":"Nilfisk","nintendo":"Nintendo","nitromors":"Nitromors","norbar":"Norbar","nortonclipper":"Norton Clipper",
+  "nullifire":"Nullifire","numatic":"Numatic","nws":"NWS",
+
+  "oakey":"Oakey","ology":"OLOGY","olympia":"Olympia","olympiatools":"Olympia Tools","owlett":"Owlett",
+  "owlettjaton":"Owlett-Jaton","owletts":"Owlett",
+
+  "panasonic":"Panasonic","parweld":"Parweld","paslode":"Paslode","paslodescrews":"Paslode","permex":"Permex",
+  "personna":"Personna","peststop":"Pest-Stop","plasplugs":"Plasplugs","plastikote":"PlastiKote","plus":"Plus",
+  "plusgas":"PlusGas","polycell":"Polycell","polyvine":"Polyvine","portanails":"Porta-Nails","portwest":"Portwest",
+  "pramac":"Pramac","predator":"Predator","premierdiamond":"Premier Diamond","priory":"Priory","products":"Other",
+  "pumasafety":"Puma Safety","purdy":"Purdy","python":"Python",
+
+  "qmax":"Q.Max",
+
+  "rst":"R.S.T.","raaco":"Raaco","ragni":"Ragni","rapid":"Rapid","rawl":"Rawlplug","rawlplug":"Rawlplug",
+  "realdeals":"RealDeals","recoil":"Recoil","record":"Record","recordpower":"Record Power","red":"Red Gorilla",
+  "redgorilla":"Red Gorilla","rentokil":"Rentokil","repesco":"Repesco","resapol":"Resapol","rhino":"Rhino","ridgid":"RIDGID",
+  "ring":"Ring","rocol":"ROCOL","rohm":"Röhm","ronseal":"Ronseal","rotabroach":"Rotabroach","rothenberger":"Rothenberger",
+  "roughneck":"Roughneck","rus":"RUS","rustins":"Rustins","ryobi":"Ryobi",
+
+  "sadolin":"Sadolin","samsung":"Samsung","scjohnsonprof":"SC Johnson Professional","scan":"Scan","scheppach":"Scheppach",
+  "schneider":"Schneider","screwix":"Screwix","scruffs":"Scruffs","sealey":"Sealey","sellotape":"Sellotape","senco":"Senco",
+  "sharpie":"Sharpie","shurtape":"Shurtape","sia":"SIA","siaabrasives":"Sia Abrasives","sievert":"Sievert",
+  "sikkens":"Sikkens","silversteel":"Silver Steel","silverhook":"Silverhook","sip":"SIP","smj":"SMJ","snail":"Snail",
+  "solvite":"Solvite","sparky":"Sparky","spax":"SPAX","spectre":"Spectre","squire":"Squire","stabila":"Stabila",
+  "stahlwille":"Stahlwille","stanley":"Stanley","stanleyclothing":"Stanley","stanleyintelli":"Stanley",
+  "stanleyspares":"Stanley","stanleytools":"Stanley","starrett":"Starrett","steeple":"Steeple","steinel":"Steinel",
+  "stencils":"Stencils","sterimax":"Sterimax","stf":"STF","stihl":"Stihl","stiletto":"Stiletto","sumup":"SumUp",
+  "swarfega":"Swarfega","sylglas":"Sylglas",
+
+  "tacwise":"Tacwise","tbdavies":"TB Davies","tb":"TB","teng":"Teng Tools","tengtools":"Teng Tools","terma":"Terma",
+  "terry":"Terry","testo":"Testo","tetrionfillers":"Tetrion","thor":"Thor","thorsman":"Thorsman","timberlandpro":"Timberland Pro",
+  "timco":"TIMco","toolbank":"Toolbank","toolden":"Toolden","toolmaster":"Toolmaster","tools":"Other","toshiba":"Toshiba",
+  "toughbuilt":"ToughBuilt","toupret":"Toupret","towncountry":"Town & Country","traffi":"TRAFFI","tremco":"TREMCO",
+  "trend":"Trend","triflow":"Tri-Flow","triton":"Triton","trollull":"Trollull","tuffstuff":"Tuffstuff","turtlewax":"Turtle Wax",
+  "tuw":"TUW","tygris":"TYGRIS","tyrgris":"TYGRIS",
+
+  "ucare":"U-Care","uhook":"U-Hook","upol":"U-POL","ultracompact":"Ultra Compact","unicom":"Uni-Com","unibond":"Unibond",
+  "unifix":"Unifix","union":"Union",
+
+  "vanguard":"Van Guard","vanvault":"Van Vault","vaughan":"Vaughan","velcrobrand":"VELCRO Brand","victorinox":"Victorinox",
+  "vileda":"Vileda","vitax":"Vitax","vitrex":"Vitrex",
+
+  "wagner":"Wagner","walsall":"Walsall","wanbo":"Wanbo","wd40":"WD-40","weller":"Weller","wera":"Wera","werner":"Werner",
+  "wesco":"Wesco","wetjet":"WetJet","wiha":"Wiha","witte":"Witte",
+
+  "yale":"Yale","yalelocks":"Yale","youngman":"Youngman","zarges":"Zarges","zenithprofin":"Zenith Profin","zinsser":"Zinsser",
+  "zipper":"Zipper"
 };
 
 function canonicalBrand(name){
   const k = normKey(name);
-  return BRAND_ALIASES[k] || (name ? String(name).trim() : "Unknown");
+  if (!k || NOT_BRAND_KEYS.has(k)) return "Other";
+  return BRAND_ALIASES[k] || (name ? String(name).trim() : "Other");
 }
 
 const brandColours = {
-  "Milwaukee": "#d0021b",
-  "DeWalt": "#ffd000",
-  "Makita": "#00a19b",
-  "Bosch": "#1f6feb",
-  "HiKOKI": "#0b8457",
-  "Einhell": "#cc0033",
-  "Everbuild": "#ff8c00",
-  "N-Durance": "#7d5cff"
+  "Milwaukee": "#d0021b","DeWalt": "#ffd000","Makita": "#00a19b","Bosch": "#1f6feb","HiKOKI": "#0b8457",
+  "Everbuild": "#ff8c00","N-Durance": "#7d5cff","Metabo":"#136f63","Festool":"#2b8a3e","Stanley":"#ffeb3b",
+  "Irwin":"#005eb8","ABUS":"#0aa55b","Makita":"#00a19b"
 };
 const fallbackColours = ["#6aa6ff","#ff9fb3","#90e0c5","#ffd08a","#c9b6ff","#8fd3ff","#ffc6a8","#b2e1a1","#f5b3ff","#a4b0ff"];
 function brandColour(name, i=0){ return brandColours[name] || fallbackColours[i % fallbackColours.length]; }
@@ -133,7 +250,7 @@ function hydrate(arrayRows){
     });
 
     const brandRaw = headerMap.brand>=0 ? String(r[headerMap.brand]??"").trim() : "";
-    const brand = canonicalBrand(brandRaw);
+    const brand = canonicalBrand(brandRaw); // merged brand
 
     const internetSales = headerMap.internetSales>=0 ? toNumber(r[headerMap.internetSales]) : 0;
     const ebaySales     = headerMap.ebaySales>=0 ? toNumber(r[headerMap.ebaySales]) : 0;
@@ -162,21 +279,24 @@ function hydrate(arrayRows){
 /* ========= Filtering ========= */
 function uniqueSorted(arr){ return [...new Set(arr.filter(Boolean))].sort((a,b)=>a.localeCompare(b)); }
 
-// Global items for dashboards (ignore free-text search)
+// Global items for dashboards (ignore free-text search), ONLY normalised brands (exclude "Other")
 function baseItemsForAggregates(){
   const br  = document.getElementById("brandFilter").value;
   return data.filter(d=>{
+    const okBrand = d.brand && d.brand !== "Other"; // only normalised brands
+    if (!okBrand) return false;
     if (br  && d.brand !== br) return false;
     return true;
   });
 }
 
-// Items that apply the search (used for SKU focus + invoice table)
+// Items with search (for SKU detail/table); allow all brands so search remains complete
 function itemsWithSearch(){
   const q   = document.getElementById("search").value.trim().toLowerCase();
   const br  = document.getElementById("brandFilter").value;
   return data.filter(d=>{
-    if (br  && d.brand !== br) return false;
+    // Respect brand filter (but still excludes "Other" if user chose a brand)
+    if (br && d.brand !== br) return false;
     if (q){
       const hay=(d.description+" "+d.stockCode).toLowerCase();
       if (!hay.includes(q)) return false;
@@ -188,7 +308,8 @@ function itemsWithSearch(){
 function populateFilters(){
   const brandSel = document.getElementById("brandFilter");
   brandSel.length = 1;
-  uniqueSorted(data.map(d=>d.brand)).forEach(v=> brandSel.add(new Option(v, v)));
+  // Only canonical brands (exclude "Other")
+  uniqueSorted(data.map(d=>d.brand).filter(b=>b && b!=="Other")).forEach(v=> brandSel.add(new Option(v, v)));
 }
 
 /* ========= Sorting ========= */
@@ -225,7 +346,7 @@ function revenueSeries(items){
 function summariseByBrand(items){
   const by=new Map();
   for(const d of items){
-    const key = d.brand || "Unknown";
+    const key = d.brand || "Other";
     if(!by.has(key)){
       by.set(key,{
         brand:key,
@@ -240,7 +361,6 @@ function summariseByBrand(items){
     b.combinedSales += Number.isFinite(d.combinedSales)? d.combinedSales : 0;
     b.stockValue    += Number.isFinite(d.stockValue)? d.stockValue : 0;
     if (Number.isFinite(d.profitPct)){ b.profitSum += d.profitPct; b.profitCount += 1; }
-    // monthly revenue (price-basis × month units)
     for (const {name} of monthColumns){
       const r=d.monthsRevenue[name];
       b.months[name] += Number.isFinite(r)? r : 0;
@@ -254,7 +374,7 @@ function summariseByBrand(items){
     avgProfitPct: r.profitCount? r.profitSum/r.profitCount : NaN,
     revenue:r.revenue,
     months:r.months
-  }));
+  })).filter(r=> r.brand !== "Other"); // exclude "Other" from brand summaries
   rows.sort((a,b)=> b.revenue - a.revenue);
   return rows;
 }
@@ -270,7 +390,7 @@ function refresh(){
   const avgProfit = itemsAgg.length ? sum(itemsAgg.map(d=>d.profitPct))/itemsAgg.length : NaN;
   const combinedSales = sum(itemsAgg.map(d=>d.combinedSales));
 
-  // Estimated YTD revenue (sum of monthsRevenue up to the last active month across the dataset)
+  // Estimated YTD revenue
   const revAgg = revenueSeries(itemsAgg);
   const ytdRevenue = sum(revAgg.perMonth);
 
@@ -330,7 +450,6 @@ function safeClear(id){
 
 /* ========= Charts ========= */
 
-// Sales & Revenue per Month (units + revenue + truncated cumulative)
 function drawSalesRevenueTrend(items, rev){
   const months = rev.months;
   const unitSums = months.map(m => items.reduce((s,d)=> s + (Number.isFinite(d.months[m]) ? d.months[m] : 0), 0));
@@ -353,7 +472,6 @@ function drawSalesRevenueTrend(items, rev){
   },{responsive:true});
 }
 
-// Fab 4 revenue share
 function drawBrandRevShareFab4(items){
   const rows = summariseByBrand(items);
   const wanted = ["Milwaukee","DeWalt","Makita","Bosch"];
@@ -376,7 +494,6 @@ function drawBrandRevShareFab4(items){
   },{responsive:true});
 }
 
-// Combined Sales by Brand
 function drawBrandTotalsBar(items){
   const rows = summariseByBrand(items).slice(0,15);
   Plotly.newPlot("brandTotalsBar",[{
@@ -394,7 +511,6 @@ function drawBrandTotalsBar(items){
   },{responsive:true});
 }
 
-// Monthly Units by Brand (stacked)
 function drawBrandMonthlyStacked(items){
   const rows = summariseByBrand(items).slice(0,10);
   const months = monthColumns.map(c=>c.name);
@@ -415,7 +531,6 @@ function drawBrandMonthlyStacked(items){
   },{responsive:true});
 }
 
-// Brand revenue bar (ex VAT)
 function drawBrandRevenueBar(items){
   const rows = summariseByBrand(items).slice(0,15);
   Plotly.newPlot("brandRevenueBar",[{
@@ -473,7 +588,6 @@ function drawBrandTop10RevenueShare(items){
   },{responsive:true});
 }
 
-// Top revenue SKUs (ex VAT)
 function drawSkuRevenueTop(items){
   const months = monthColumns.map(m=>m.name);
   const withRevenue = items.map(d=>({
@@ -507,7 +621,7 @@ function truncatedMonthsForSku(d){
     const u = d.months[months[i]];
     const r = d.monthsRevenue[months[i]];
     if ((Number.isFinite(u) && u > 0) || (Number.isFinite(r) && r > 0)) { last = i; break; }
-    }
+  }
   const end = last >= 0 ? last + 1 : 0;
   return months.slice(0, end);
 }
