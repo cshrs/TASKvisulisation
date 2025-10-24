@@ -37,7 +37,7 @@ h1{margin:0 0 12px;font-weight:800;letter-spacing:.2px}
 }
 .controls input[type="search"], .controls select{
   padding:10px 12px; border-radius:12px; border:1px solid var(--border);
-  background:#fff; color:#2a2a33; min-width:220px; box-shadow:0 1px 0 rgba(0,0,0,.03);
+  background:#fff; color:#2a2a33; min-width:180px; box-shadow:0 1px 0 rgba(0,0,0,.03);
 }
 .controls .file input{display:none}
 .controls .file span, button{
@@ -102,7 +102,7 @@ thead th{position:sticky; top:0; background:#f7f8ff; z-index:1}
 @media (max-width:1024px){ .chart{height:460px} }
 @media (max-width:800px){
   .chart{height:380px}
-  .controls input[type="search"], .controls select{min-width:180px}
+  .controls input[type="search"], .controls select{min-width:160px}
 }
 
 /* Note */
