@@ -581,16 +581,25 @@ function drawSkuRevenueTop(items, monthsActive){
   },{responsive:true});
 }
 
-/* ========= Render ========= */
+/* ========= Render (Units per Month follows search) ========= */
 function refresh(){
-  const itemsAgg = baseItemsForAggregates();    // global dashboards
-  const itemsSearch = itemsWithSearch();        // search-driven (SKU focus + invoice table)
+  const itemsAgg    = baseItemsForAggregates();   // global dashboards (brand-only filter)
+  const itemsSearch = itemsWithSearch();          // respects brand + search
 
   const monthsActive = activeMonths();
-  const rSeries = revenueSeries(itemsAgg, monthsActive);
-  const uSeries = unitsSeries(itemsAgg, monthsActive);
 
-  // KPIs
+  // Revenue series always based on global aggregate (brand filter only)
+  const rSeries = revenueSeries(itemsAgg, monthsActive);
+
+  // Units:
+  // - If there's a search term, drive the Units chart from the searched items.
+  // - Otherwise, use the global aggregate.
+  const hasSearch = document.getElementById("search").value.trim().length > 0;
+  const itemsForUnits = hasSearch ? itemsSearch : itemsAgg;
+  const uSeriesUnits  = unitsSeries(itemsForUnits, monthsActive); // for Units per Month chart
+  const uSeriesAgg    = unitsSeries(itemsAgg, monthsActive);      // for other brand-level charts
+
+  // KPIs (based on global aggregate)
   setText("kpiTotalSkus", itemsAgg.length.toLocaleString("en-GB"));
   const stockValue = sum(itemsAgg.map(d=>d.stockValue));
   setText("kpiStockValue", fmtGBP(stockValue));
@@ -602,27 +611,26 @@ function refresh(){
 
   // Determine whether to hide comparative brand charts
   const brandValue = document.getElementById("brandFilter").value;
-  const hasSearch  = document.getElementById("search").value.trim().length > 0;
   const hideComparative = !!brandValue || hasSearch;
 
   // Always-visible charts
-  drawUnitsTrend(uSeries);
+  drawUnitsTrend(uSeriesUnits);      // <-- now driven by search when present
   drawRevenueTrend(rSeries);
   drawBrandMonthlyStacked(itemsAgg);
   drawSkuRevenueTop(itemsAgg, monthsActive);
 
   // Conditionally visible comparative charts (hide when brand or search is active)
-  setVisible("brandRevShareFab4", !hideComparative);
-  setVisible("brandTotalsBar",    !hideComparative);
-  setVisible("brandRevenueBar",   !hideComparative);
+  setVisible("brandRevShareFab4",      !hideComparative);
+  setVisible("brandTotalsBar",         !hideComparative);
+  setVisible("brandRevenueBar",        !hideComparative);
   setVisible("brandTop10OrderShare",   !hideComparative);
   setVisible("brandTop10RevenueShare", !hideComparative);
 
   if (!hideComparative){
     drawBrandRevShareFab4(itemsAgg, rSeries);
-    drawBrandTotalsBar(itemsAgg, uSeries);
+    drawBrandTotalsBar(itemsAgg, uSeriesAgg);
     drawBrandRevenueBar(itemsAgg, rSeries);
-    drawBrandTop10OrderShare(itemsAgg, uSeries);
+    drawBrandTop10OrderShare(itemsAgg, uSeriesAgg);
     drawBrandTop10RevenueShare(itemsAgg, rSeries);
   }
 
@@ -630,7 +638,6 @@ function refresh(){
   const q = document.getElementById("search").value.trim();
   const matches = itemsSearch;
   const focus = q && matches.length > 0 && matches.length <= 5;
-
   if (focus) {
     drawSkuFocusTrend(matches);
   } else {
@@ -652,7 +659,7 @@ function refresh(){
     if (detail) detail.hidden = true;
   }
 
-  // Invoice table reflects the current search — limit 400 unless brand is filtered
+  // Invoice table: limit 400 unless brand is filtered
   renderInvoiceTable(matches);
 }
 
