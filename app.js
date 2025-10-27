@@ -346,13 +346,7 @@ function summariseByBrand(items, monthsActive){
   for(const d of items){
     const key = d.brand || "Other";
     if(!by.has(key)){
-      by.set(key,{
-        brand:key,
-        units:0,
-        stockValue:0,
-        profitSum:0, profitCount:0,
-        revenue:0
-      });
+      by.set(key,{ brand:key, units:0, stockValue:0, profitSum:0, profitCount:0, revenue:0 });
     }
     const b=by.get(key);
     b.stockValue    += Number.isFinite(d.stockValue)? d.stockValue : 0;
@@ -369,68 +363,6 @@ function summariseByBrand(items, monthsActive){
   return rows;
 }
 
-/* ========= Render ========= */
-function refresh(){
-  const itemsAgg = baseItemsForAggregates();    // global dashboards
-  const itemsSearch = itemsWithSearch();        // search-driven (SKU focus + invoice table)
-
-  const monthsActive = activeMonths();
-  const rSeries = revenueSeries(itemsAgg, monthsActive);
-  const uSeries = unitsSeries(itemsAgg, monthsActive);
-
-  // KPIs (period-aware)
-  setText("kpiTotalSkus", itemsAgg.length.toLocaleString("en-GB"));
-  const stockValue = sum(itemsAgg.map(d=>d.stockValue));
-  setText("kpiStockValue", fmtGBP(stockValue));
-
-  const totalRevenue = sum(rSeries.perMonth);
-  setText("kpiYtdRevenue", fmtGBP(totalRevenue));
-  document.getElementById("kpiRevenueLabel").textContent = "EST. REVENUE (ex VAT)";
-
-  const combinedSales = sum(itemsAgg.map(d=>d.combinedSales)); // as exported (lifetime)
-  setText("kpiSalesCombined", Number.isFinite(combinedSales) ? combinedSales.toLocaleString("en-GB") : "–");
-
-  // Global charts (period-aware; titles without extra context)
-  drawUnitsTrend(uSeries);
-  drawRevenueTrend(rSeries);
-  drawBrandRevShareFab4(itemsAgg, rSeries);
-  drawBrandTotalsBar(itemsAgg, uSeries);
-  drawBrandMonthlyStacked(itemsAgg);
-  drawBrandRevenueBar(itemsAgg, rSeries);
-  drawBrandTop10OrderShare(itemsAgg, uSeries);
-  drawBrandTop10RevenueShare(itemsAgg, rSeries);
-  drawSkuRevenueTop(itemsAgg, monthsActive);
-
-  // SKU focus area (appears on 1–5 matches)
-  const q = document.getElementById("search").value.trim();
-  const matches = itemsSearch;
-  const focus = q && matches.length > 0 && matches.length <= 5;
-
-  if (focus) {
-    drawSkuFocusTrend(matches);
-  } else {
-    safeClear("skuFocusTrend");
-  }
-
-  // Single-SKU detail card with invoice date
-  const detail = document.getElementById("skuDetail");
-  if (q && matches.length === 1) {
-    const d = matches[0];
-    detail.hidden = false;
-    setText("skuDetailTitle", `SKU Details — ${d.stockCode}`);
-    setText("dSku", d.stockCode || "–");
-    setText("dDesc", d.description || "–");
-    setText("dBrand", d.brand || "–");
-    setText("dSub", d.subCategory || "–");
-    setText("dInv", fmtDateUK(d.lastInvoice));
-  } else {
-    if (detail) detail.hidden = true;
-  }
-
-  // Invoice table reflects the current search — limit 400 unless brand is filtered
-  renderInvoiceTable(matches);
-}
-
 /* ========= Chart helpers ========= */
 function safeClear(id){
   const el = document.getElementById(id);
@@ -438,8 +370,14 @@ function safeClear(id){
   try { Plotly.purge(id); } catch {}
   el.innerHTML = "";
 }
+function setVisible(id, visible){
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = visible ? "" : "none";
+  if (!visible) safeClear(id);
+}
 
-/* ========= Charts (titles reverted to simple labels) ========= */
+/* ========= Charts (simple titles) ========= */
 
 // Units per Month
 function drawUnitsTrend(uSeries){
@@ -641,6 +579,81 @@ function drawSkuRevenueTop(items, monthsActive){
     yaxis:{title:"£ ex VAT"},
     height: document.getElementById("skuRevenueTop")?.clientHeight || 520
   },{responsive:true});
+}
+
+/* ========= Render ========= */
+function refresh(){
+  const itemsAgg = baseItemsForAggregates();    // global dashboards
+  const itemsSearch = itemsWithSearch();        // search-driven (SKU focus + invoice table)
+
+  const monthsActive = activeMonths();
+  const rSeries = revenueSeries(itemsAgg, monthsActive);
+  const uSeries = unitsSeries(itemsAgg, monthsActive);
+
+  // KPIs
+  setText("kpiTotalSkus", itemsAgg.length.toLocaleString("en-GB"));
+  const stockValue = sum(itemsAgg.map(d=>d.stockValue));
+  setText("kpiStockValue", fmtGBP(stockValue));
+  const totalRevenue = sum(rSeries.perMonth);
+  setText("kpiYtdRevenue", fmtGBP(totalRevenue));
+  document.getElementById("kpiRevenueLabel").textContent = "EST. REVENUE (ex VAT)";
+  const combinedSales = sum(itemsAgg.map(d=>d.combinedSales));
+  setText("kpiSalesCombined", Number.isFinite(combinedSales) ? combinedSales.toLocaleString("en-GB") : "–");
+
+  // Determine whether to hide comparative brand charts
+  const brandValue = document.getElementById("brandFilter").value;
+  const hasSearch  = document.getElementById("search").value.trim().length > 0;
+  const hideComparative = !!brandValue || hasSearch;
+
+  // Always-visible charts
+  drawUnitsTrend(uSeries);
+  drawRevenueTrend(rSeries);
+  drawBrandMonthlyStacked(itemsAgg);
+  drawSkuRevenueTop(itemsAgg, monthsActive);
+
+  // Conditionally visible comparative charts (hide when brand or search is active)
+  setVisible("brandRevShareFab4", !hideComparative);
+  setVisible("brandTotalsBar",    !hideComparative);
+  setVisible("brandRevenueBar",   !hideComparative);
+  setVisible("brandTop10OrderShare",   !hideComparative);
+  setVisible("brandTop10RevenueShare", !hideComparative);
+
+  if (!hideComparative){
+    drawBrandRevShareFab4(itemsAgg, rSeries);
+    drawBrandTotalsBar(itemsAgg, uSeries);
+    drawBrandRevenueBar(itemsAgg, rSeries);
+    drawBrandTop10OrderShare(itemsAgg, uSeries);
+    drawBrandTop10RevenueShare(itemsAgg, rSeries);
+  }
+
+  // SKU focus area (appears on 1–5 matches)
+  const q = document.getElementById("search").value.trim();
+  const matches = itemsSearch;
+  const focus = q && matches.length > 0 && matches.length <= 5;
+
+  if (focus) {
+    drawSkuFocusTrend(matches);
+  } else {
+    safeClear("skuFocusTrend");
+  }
+
+  // Single-SKU detail card with invoice date
+  const detail = document.getElementById("skuDetail");
+  if (q && matches.length === 1) {
+    const d = matches[0];
+    detail.hidden = false;
+    setText("skuDetailTitle", `SKU Details — ${d.stockCode}`);
+    setText("dSku", d.stockCode || "–");
+    setText("dDesc", d.description || "–");
+    setText("dBrand", d.brand || "–");
+    setText("dSub", d.subCategory || "–");
+    setText("dInv", fmtDateUK(d.lastInvoice));
+  } else {
+    if (detail) detail.hidden = true;
+  }
+
+  // Invoice table reflects the current search — limit 400 unless brand is filtered
+  renderInvoiceTable(matches);
 }
 
 /* ========= SKU Focus (search 1–5 matches) ========= */
