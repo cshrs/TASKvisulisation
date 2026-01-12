@@ -31,12 +31,10 @@
         <option value="YTD" selected>Period: YTD</option>
         <option value="Month">Period: Month</option>
       </select>
-      <select id="monthSelect" title="Select month" style="display:none">
-        <!-- options populated after CSV load -->
-      </select>
+      <select id="monthSelect" title="Select month" style="display:none"></select>
 
-      <!-- Brand filter comes from “Manu/ Brand” column (normalised) -->
-      <select id="brandFilter"><option value="">Brand</option></select>
+      <!-- Brand filter from “Manu/ Brand” column (normalised) -->
+      <select id="brandFilter"><option value="">Brand (Manu/Brand — All)</option></select>
 
       <select id="sortBy">
         <option value="profitDesc">Sort: Profit % (high→low)</option>
@@ -52,21 +50,41 @@
   <main>
     <!-- KPIs -->
     <div id="kpis" class="kpis">
-      <div class="kpi"><div class="kpi-value" id="kpiTotalSkus">–</div><div class="kpi-label">SKUs (filtered)</div></div>
-      <div class="kpi"><div class="kpi-value" id="kpiStockValue">–</div><div class="kpi-label">STOCK VALUE</div></div>
-      <div class="kpi"><div class="kpi-value" id="kpiYtdRevenue">–</div><div class="kpi-label" id="kpiRevenueLabel">EST. REVENUE (ex VAT)</div></div>
-      <div class="kpi"><div class="kpi-value" id="kpiSalesCombined">–</div><div class="kpi-label">COMBINED SALES (Internet + eBay)</div></div>
+      <div class="kpi">
+        <div class="kpi-value" id="kpiTotalSkus">–</div>
+        <div class="kpi-label">SKUs (filtered)</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-value" id="kpiStockValue">–</div>
+        <div class="kpi-label">STOCK VALUE</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-value" id="kpiYtdRevenue">–</div>
+        <div class="kpi-label" id="kpiRevenueLabel">EST. REVENUE (ex VAT)</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-value" id="kpiSalesCombined">–</div>
+        <div class="kpi-label">COMBINED SALES (Internet + eBay)</div>
+      </div>
     </div>
 
-    <!-- Global charts (ignore free-text search; honour Brand + Period dropdowns) -->
+    <!-- Core charts -->
     <div class="chart" id="salesUnitsTrend"></div>
     <div class="chart" id="revenueTrend"></div>
+
+    <!-- New YoY charts -->
+    <div class="chart" id="yoyUnits"></div>
+    <div class="chart" id="yoyRevenue"></div>
+
+    <!-- Comparative brand charts (auto-hidden when Brand or Search is active) -->
     <div class="chart" id="brandRevShareFab4"></div>
     <div class="chart" id="brandTotalsBar"></div>
     <div class="chart" id="brandMonthlyStacked"></div>
     <div class="chart" id="brandRevenueBar"></div>
     <div class="chart" id="brandTop10OrderShare"></div>
     <div class="chart" id="brandTop10RevenueShare"></div>
+
+    <!-- SKU revenue -->
     <div class="chart" id="skuRevenueTop"></div>
 
     <!-- SKU focus: appears only when search matches 1–5 SKUs -->
@@ -83,7 +101,7 @@
 
     <div class="chart" id="skuFocusTrend"></div>
 
-    <!-- Last Invoice Dates (table – reflects current search) -->
+    <!-- Last Invoice Dates -->
     <div class="table-card">
       <h2>Last Invoice Date (per SKU)</h2>
       <div class="table-wrap">
@@ -97,15 +115,16 @@
               <th>Last Invoice Date</th>
             </tr>
           </thead>
-          <tbody><!-- populated dynamically --></tbody>
+          <tbody></tbody>
         </table>
       </div>
       <div class="note">Showing the first 400 SKUs that match your current search/filters. Select a Brand to see all matches.</div>
     </div>
 
     <p class="note">
-      Estimated Revenue = <em>(Sale Price Ex VAT if present, else Online Price Ex VAT)</em> × <em>monthly units</em>.  
-      Combined Sales = Internet Sales + eBay (as exported). Previous year columns are ignored. Parsing is 100% in-memory from the original TASK export.
+      Estimated Revenue = <em>(Sale Price Ex VAT if present, else Online Price Ex VAT)</em> × <em>monthly units</em>.
+      Combined Sales = Internet Sales + eBay (as exported). Previous year columns are ignored except for the YoY charts.
+      Parsing is 100% in-memory from the original TASK export.
     </p>
   </main>
 </body>
