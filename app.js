@@ -1,5 +1,5 @@
 /* ========= Configuration ========= */
-const BUILT_IN_CSV = ""; // optional, eg "PAUL.CSV" if you commit it alongside the site
+const BUILT_IN_CSV = "OVER.CSV"; // optional, eg "PAUL.CSV" if you commit it alongside the site
 
 /* ========= Brand normalisation & colours ========= */
 const normKey = s => String(s||"").toLowerCase().replace(/[^a-z0-9]+/g,"");
