@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>TASK Export Visualisation</title>
+  <title>TASK Export Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="style.css" />
 
@@ -11,99 +11,198 @@
   <script defer src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
   <script defer src="app.js"></script>
 </head>
+
 <body>
-  <header>
-    <h1>TASK Export Visualisation</h1>
-    <div class="controls">
-      <label class="file">
-        <input id="file" type="file" accept=".csv" />
-        <span>Choose CSV (raw export, unmodified)</span>
-      </label>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="title">
+        <h1>TASK Export Dashboard</h1>
+        <p>Drop in a raw TASK CSV export. No pre-cleaning required.</p>
+      </div>
 
-      <button id="loadSample" title="If you committed a CSV into the repo, set its filename in app.js">
-        Load CSV from site
-      </button>
+      <div class="controls">
+        <label class="file">
+          <input id="file" type="file" accept=".csv" />
+          <span>Choose CSV</span>
+        </label>
 
-      <input id="search" type="search" placeholder="Search by SKU or description…" />
+        <button id="loadSample" type="button" title="If you committed a CSV into the repo, set its filename in app.js">
+          Load CSV from site
+        </button>
 
-      <!-- Period filter -->
-      <select id="periodMode" title="Choose YTD or a single month">
-        <option value="YTD" selected>Period: YTD</option>
-        <option value="Month">Period: Month</option>
-      </select>
-      <select id="monthSelect" title="Select month" style="display:none"></select>
+        <input id="search" type="search" placeholder="Search SKU or description" />
 
-      <!-- Brand filter from “Manu/ Brand” column (normalised) -->
-      <select id="brandFilter"><option value="">Brand (Manu/Brand — All)</option></select>
+        <select id="periodMode" title="Choose YTD or a single month">
+          <option value="YTD" selected>Period: YTD</option>
+          <option value="Month">Period: Month</option>
+        </select>
 
-      <select id="sortBy">
-        <option value="profitDesc">Sort: Profit % (high→low)</option>
-        <option value="profitAsc">Sort: Profit % (low→high)</option>
-        <option value="brandAZ">Sort: Brand A→Z</option>
-        <option value="brandZA">Sort: Brand Z→A</option>
-        <option value="skuAZ">Sort: SKU A→Z</option>
-        <option value="skuZA">Sort: SKU Z→A</option>
-      </select>
+        <select id="monthSelect" title="Select month" style="display:none"></select>
+
+        <select id="brandFilter" title="Filter by normalised brand from Manu/Brand">
+          <option value="">Brand (All)</option>
+        </select>
+
+        <select id="sortBy" title="Sort options for table and detail">
+          <option value="profitDesc">Sort: Profit % (high to low)</option>
+          <option value="profitAsc">Sort: Profit % (low to high)</option>
+          <option value="brandAZ">Sort: Brand A to Z</option>
+          <option value="brandZA">Sort: Brand Z to A</option>
+          <option value="skuAZ">Sort: SKU A to Z</option>
+          <option value="skuZA">Sort: SKU Z to A</option>
+        </select>
+      </div>
     </div>
   </header>
 
-  <main>
-    <!-- KPIs -->
-    <div id="kpis" class="kpis">
+  <main class="wrap">
+    <!-- KPI row -->
+    <section class="kpis">
       <div class="kpi">
         <div class="kpi-value" id="kpiTotalSkus">–</div>
         <div class="kpi-label">SKUs (filtered)</div>
       </div>
+
       <div class="kpi">
         <div class="kpi-value" id="kpiStockValue">–</div>
-        <div class="kpi-label">STOCK VALUE</div>
+        <div class="kpi-label">Stock value</div>
       </div>
+
       <div class="kpi">
         <div class="kpi-value" id="kpiYtdRevenue">–</div>
-        <div class="kpi-label" id="kpiRevenueLabel">EST. REVENUE (ex VAT)</div>
+        <div class="kpi-label" id="kpiRevenueLabel">Est. revenue (ex VAT)</div>
       </div>
+
       <div class="kpi">
         <div class="kpi-value" id="kpiSalesCombined">–</div>
-        <div class="kpi-label">COMBINED SALES (Internet + eBay)</div>
+        <div class="kpi-label">Combined sales (Internet + eBay)</div>
       </div>
-    </div>
+    </section>
 
-    <!-- Core charts -->
-    <div class="chart" id="salesUnitsTrend"></div>
-    <div class="chart" id="revenueTrend"></div>
+    <!-- Primary charts -->
+    <section class="grid">
+      <div class="card">
+        <div class="card-head">
+          <h2>Units per Month</h2>
+          <p>Uses Aug to Jul unit columns. If you search, it shows only matching SKUs.</p>
+        </div>
+        <div class="chart" id="salesUnitsTrend"></div>
+      </div>
 
-    <!-- New YoY charts -->
-    <div class="chart" id="yoyUnits"></div>
-    <div class="chart" id="yoyRevenue"></div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Estimated Revenue per Month (ex VAT)</h2>
+          <p>(Sale Price ex VAT if present else Online Price ex VAT) × monthly units.</p>
+        </div>
+        <div class="chart" id="revenueTrend"></div>
+      </div>
 
-    <!-- Comparative brand charts (auto-hidden when Brand or Search is active) -->
-    <div class="chart" id="brandRevShareFab4"></div>
-    <div class="chart" id="brandTotalsBar"></div>
-    <div class="chart" id="brandMonthlyStacked"></div>
-    <div class="chart" id="brandRevenueBar"></div>
-    <div class="chart" id="brandTop10OrderShare"></div>
-    <div class="chart" id="brandTop10RevenueShare"></div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Units YoY (Current vs Previous Year)</h2>
+          <p>Uses the Prev Year monthly unit columns where present.</p>
+        </div>
+        <div class="chart" id="yoyUnits"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Estimated Revenue YoY (ex VAT)</h2>
+          <p>Prev Year revenue is estimated using Prev Year units with current price basis.</p>
+        </div>
+        <div class="chart" id="yoyRevenue"></div>
+      </div>
+    </section>
+
+    <!-- Comparative charts (auto-hidden when brand or search is active) -->
+    <section class="grid">
+      <div class="card" id="brandRevShareFab4Card">
+        <div class="card-head">
+          <h2>Revenue Share: Milwaukee, DeWalt, Makita, Bosch</h2>
+          <p>Hidden when Brand or Search is active.</p>
+        </div>
+        <div class="chart" id="brandRevShareFab4"></div>
+      </div>
+
+      <div class="card" id="brandTotalsBarCard">
+        <div class="card-head">
+          <h2>Units by Brand (Top 15)</h2>
+          <p>Hidden when Brand or Search is active.</p>
+        </div>
+        <div class="chart" id="brandTotalsBar"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Monthly Units by Brand (Current Year)</h2>
+          <p>Top brands by revenue. Stacked units across the year.</p>
+        </div>
+        <div class="chart" id="brandMonthlyStacked"></div>
+      </div>
+
+      <div class="card" id="brandRevenueBarCard">
+        <div class="card-head">
+          <h2>Estimated Revenue by Brand (Top 15, ex VAT)</h2>
+          <p>Hidden when Brand or Search is active.</p>
+        </div>
+        <div class="chart" id="brandRevenueBar"></div>
+      </div>
+
+      <div class="card" id="brandTop10OrderShareCard">
+        <div class="card-head">
+          <h2>Top 10 Brands: Order Share (Units)</h2>
+          <p>Hidden when Brand or Search is active.</p>
+        </div>
+        <div class="chart" id="brandTop10OrderShare"></div>
+      </div>
+
+      <div class="card" id="brandTop10RevenueShareCard">
+        <div class="card-head">
+          <h2>Top 10 Brands: Revenue Share (ex VAT)</h2>
+          <p>Hidden when Brand or Search is active.</p>
+        </div>
+        <div class="chart" id="brandTop10RevenueShare"></div>
+      </div>
+    </section>
 
     <!-- SKU revenue -->
-    <div class="chart" id="skuRevenueTop"></div>
-
-    <!-- SKU focus: appears only when search matches 1–5 SKUs -->
-    <div class="detail-card" id="skuDetail" hidden>
-      <h2 id="skuDetailTitle">SKU Details</h2>
-      <div class="detail-grid">
-        <div><span class="dl">Stock Code</span><span class="dv" id="dSku">–</span></div>
-        <div><span class="dl">Description</span><span class="dv" id="dDesc">–</span></div>
-        <div><span class="dl">Brand</span><span class="dv" id="dBrand">–</span></div>
-        <div><span class="dl">Sub Category</span><span class="dv" id="dSub">–</span></div>
-        <div><span class="dl">Last Invoice Date</span><span class="dv" id="dInv">–</span></div>
+    <section class="grid">
+      <div class="card">
+        <div class="card-head">
+          <h2>Top 100 SKUs by Estimated Revenue (ex VAT)</h2>
+          <p>Uses the selected period (Month or YTD).</p>
+        </div>
+        <div class="chart" id="skuRevenueTop"></div>
       </div>
-    </div>
 
-    <div class="chart" id="skuFocusTrend"></div>
+      <div class="card">
+        <div class="card-head">
+          <h2>SKU Focus</h2>
+          <p>Appears when your search matches 1 to 5 SKUs.</p>
+        </div>
 
-    <!-- Last Invoice Dates -->
-    <div class="table-card">
-      <h2>Last Invoice Date (per SKU)</h2>
+        <div class="detail-card" id="skuDetail" hidden>
+          <h3 id="skuDetailTitle">SKU Details</h3>
+          <div class="detail-grid">
+            <div><span class="dl">Stock Code</span><span class="dv" id="dSku">–</span></div>
+            <div><span class="dl">Description</span><span class="dv" id="dDesc">–</span></div>
+            <div><span class="dl">Brand</span><span class="dv" id="dBrand">–</span></div>
+            <div><span class="dl">Sub Category</span><span class="dv" id="dSub">–</span></div>
+            <div><span class="dl">Last Invoice Date</span><span class="dv" id="dInv">–</span></div>
+          </div>
+        </div>
+
+        <div class="chart" id="skuFocusTrend"></div>
+      </div>
+    </section>
+
+    <!-- Invoice table -->
+    <section class="card table-card">
+      <div class="card-head">
+        <h2>Last Invoice Date (per SKU)</h2>
+        <p>Limit is 400 unless Brand is selected. Search narrows the rows.</p>
+      </div>
+
       <div class="table-wrap">
         <table id="invoiceTable">
           <thead>
@@ -118,14 +217,15 @@
           <tbody></tbody>
         </table>
       </div>
-      <div class="note">Showing the first 400 SKUs that match your current search/filters. Select a Brand to see all matches.</div>
-    </div>
 
-    <p class="note">
-      Estimated Revenue = <em>(Sale Price Ex VAT if present, else Online Price Ex VAT)</em> × <em>monthly units</em>.
-      Combined Sales = Internet Sales + eBay (as exported). Previous year columns are ignored except for the YoY charts.
-      Parsing is 100% in-memory from the original TASK export.
-    </p>
+      <div class="note">Showing the first 400 SKUs that match your current search/filters. Select a Brand to see all matches.</div>
+    </section>
+
+    <footer class="footer">
+      <p>
+        Estimated Revenue uses price fields from the export and monthly unit columns. Previous year columns are used only for YoY charts.
+      </p>
+    </footer>
   </main>
 </body>
 </html>
